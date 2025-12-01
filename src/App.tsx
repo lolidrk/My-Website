@@ -6,7 +6,7 @@ const AutonomousBlog = () => {
   const [selectedDestination, setSelectedDestination] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
-  const [currentRoute, setCurrentRoute] = useState<Array<{x: number, z: number, destination?: any}>>([]);  
+  const [currentRoute, setCurrentRoute] = useState<{path: Array<{x: number, z: number}>, destination?: any}>({path: []});
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const carRef = useRef(null);
@@ -381,7 +381,7 @@ const AutonomousBlog = () => {
   }, [isNavigating]);
 
   useEffect(() => {
-    if (!isNavigating || !carRef.current || !cameraRef.current || currentRoute.length === 0) return;
+    if (!isNavigating || !carRef.current || !cameraRef.current || currentRoute.path.length === 0) return;
 
     const duration = 4000;
     const startTime = Date.now();
@@ -396,14 +396,14 @@ const AutonomousBlog = () => {
         ? 2 * progress * progress 
         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-      const index = Math.floor(eased * (currentRoute.length - 1));
-      const targetPos = currentRoute[index];
+      const index = Math.floor(eased * (currentRoute.path.length - 1));
+      const targetPos = currentRoute.path[index];
       
       carRef.current.position.x = targetPos.x;
       carRef.current.position.z = targetPos.z;
       
-      if (index < currentRoute.length - 1) {
-        const nextPos = currentRoute[index + 1];
+      if (index < currentRoute.path.length - 1) {
+        const nextPos = currentRoute.path[index + 1];
         const angle = Math.atan2(nextPos.x - targetPos.x, nextPos.z - targetPos.z);
         carRef.current.rotation.y = angle;
       }
@@ -454,8 +454,7 @@ const AutonomousBlog = () => {
       });
     }
 
-    route.destination = destination;
-    setCurrentRoute(route);
+    setCurrentRoute({path: route, destination: destination});
     setIsNavigating(true);
     setCurrentPosition(destination);
   };

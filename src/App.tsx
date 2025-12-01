@@ -6,8 +6,7 @@ const AutonomousBlog = () => {
   const [selectedDestination, setSelectedDestination] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
-  const [currentRoute, setCurrentRoute] = useState([]);
-  const canvasRef = useRef(null);
+  const [currentRoute, setCurrentRoute] = useState<Array<{x: number, z: number, destination?: any}>>([]);  const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const carRef = useRef(null);
   const cameraRef = useRef(null);

@@ -163,11 +163,12 @@ const VectorMap = ({ currentPosition, destinations, roads, isNavigating, navigat
         </g>
       </svg>
       
-      <div className="absolute bottom-4 right-4 flex gap-2">
-        <div className="bg-slate-800 p-2 rounded-lg border border-slate-700 shadow-lg text-white opacity-80">
-          <Compass size={16} />
-        </div>
+      <div className="absolute top-7 right-7">
+      <div className="bg-slate-900/80 p-1.5 rounded-full border border-slate-700 shadow-md text-white">
+        <Compass size={14} className="text-blue-400" />
       </div>
+    </div>
+
     </div>
   );
 };
@@ -211,7 +212,7 @@ const AutonomousBlog = () => {
       antialias: true,
       alpha: true 
     });
-    renderer.setSize(800, 500);
+    renderer.setSize(800, 800);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setClearColor(0x0a0a15, 1);
@@ -246,11 +247,12 @@ const AutonomousBlog = () => {
     const roadWidth = 6;
     const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });
 
-    ROADS.forEach(road => {
-      const dx = road.to.x - road.from.x;
-      const dz = road.to.z - road.from.z;
-      const length = Math.sqrt(dx * dx + dz * dz);
-      const angle = Math.atan2(dx, dz);
+// Now build each road mesh using this material
+ROADS.forEach(road => {
+  const dx = road.to.x - road.from.x;
+  const dz = road.to.z - road.from.z;
+  const length = Math.sqrt(dx * dx + dz * dz);
+  const angle = Math.atan2(dx, dz);
 
       const roadMesh = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, length), roadMaterial);
       roadMesh.rotation.x = -Math.PI / 2;
@@ -545,9 +547,6 @@ const AutonomousBlog = () => {
                 <div className="bg-slate-900/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-slate-200 text-sm font-mono">
                     SYS.STATUS: {isNavigating ? 'NAVIGATING' : 'IDLE'}
                 </div>
-                <div className="bg-slate-900/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-blue-400 text-sm font-mono">
-                    BATTERY: 98%
-                </div>
             </div>
 
             {/* Status Pill */}
@@ -557,8 +556,8 @@ const AutonomousBlog = () => {
                     {isNavigating ? "Autonomous Mode Active..." : "Vehicle Parked"}
                  </span>
             </div>
-          {/* --- 2D Vector Map Under 3D View --- */}
-          <div className="w-full border-t border-slate-800 bg-[#0f1419] h-[300px] overflow-hidden relative">
+          {/* --- Circular Minimap Overlay --- */}
+          <div className="absolute top-6 right-6 w-48 h-48 rounded-full overflow-hidden border-2 border-slate-700 shadow-lg bg-[#0f1419]">
             <VectorMap
               currentPosition={currentPosition}
               destinations={DESTINATIONS}
@@ -567,10 +566,8 @@ const AutonomousBlog = () => {
               navigationProgress={navigationProgress}
               currentRoute={currentRoute}
             />
-            <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur text-white px-3 py-1 rounded text-xs border border-slate-700">
-              Live Satellite Feed
-            </div>
           </div>
+
 
           </div>
 

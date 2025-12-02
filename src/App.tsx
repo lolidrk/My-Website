@@ -472,7 +472,7 @@ const AutonomousBlog = () => {
         body: (
           <div className="space-y-4">
             <p className="text-gray-300">
-              Welcome to my autonomous driving research hub. Innovation meets the road.
+              Welcome to my autonomous driving research hub. Safety meets the road.
             </p>
           </div>
         )
@@ -483,15 +483,17 @@ const AutonomousBlog = () => {
           <div className="space-y-4">
             <div className="bg-slate-700 p-6 rounded-lg hover:bg-slate-600 transition-colors cursor-pointer">
               <h3 className="text-xl font-semibold text-white mb-2">
-                Deep Learning for Autonomous Navigation
+                Mitigating SSRF Threats: Integrating ML and Network Architecture
               </h3>
               <p className="text-sm text-gray-400 mb-3">2024 • IEEE Conference</p>
               <p className="text-gray-300 mb-4">
-                Novel approaches for real-time path planning using deep reinforcement learning.
+                Server Side Request Forgery (SSRF) is a vulnerability that when exploited, allows the attacker to manipulate the server into making requests to the organization’s internal network. In this research, we explore the various consequences of SSRF and introduce a system which integrates an Intrusion Detection System (IDS) and Intrusion Prevention System (IPS) with a dedicated helper server implemented using Nginx. Machine learning models, including XGBoost, are employed for threat detection, achieving high accuracy (98.55%) in classifying URLs as benign or malicious. The study highlights the efficacy of the proposed approach in mitigating SSRF threats, showcasing the importance of integrating machine learning with network security for robust threat detection and prevention. The practical implications of this approach include enhanced system security, reduced vulnerabilities to SSRF attacks, and improved defense mechanisms against malicious URL requests. Github Link: https://github.com/lolidrk/SSRF_Framework.git
               </p>
-              <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+              <button onClick={() => window.open("https://link.springer.com/chapter/10.1007/978-981-97-8669-5_1", "_blank")}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
                 Read Paper
               </button>
+
             </div>
           </div>
         )

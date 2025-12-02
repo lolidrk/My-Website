@@ -204,7 +204,7 @@ const AutonomousBlog = () => {
       antialias: true,
       alpha: true 
     });
-    renderer.setSize(600, 600);
+    renderer.setSize(800, 500);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setClearColor(0x0a0a15, 1);
@@ -352,7 +352,7 @@ const AutonomousBlog = () => {
     animate();
 
     return () => renderer.dispose();
-  }, [isNavigating]);
+  }, []);
 
   // --- Improved Navigation Logic ---
   // Calculates a strictly valid road path: Parking -> Hub -> Road -> Hub -> Parking
@@ -488,8 +488,8 @@ const AutonomousBlog = () => {
   };
 
   return (
-    <div className="w-full h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-7xl h-full max-h-[800px] bg-black rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
+    <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-7xl min-h-[800px] bg-black rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
         <div className="grid grid-cols-5 h-full">
           
           {/* --- Sidebar (Refactored Layout) --- */}
@@ -505,7 +505,7 @@ const AutonomousBlog = () => {
             </div>
             
             {/* 2. Destination List (Moved to Top) */}
-            <div className="p-4 space-y-3 bg-slate-900 overflow-y-auto flex-none">
+            <div className="p-4 space-y-3 bg-slate-900" style={{ maxHeight: "40%" }}>
               {DESTINATIONS.map(dest => (
                 <button
                   key={dest.id}
@@ -527,26 +527,11 @@ const AutonomousBlog = () => {
                 </button>
               ))}
             </div>
-
-            {/* 3. Map (Fills remaining space) */}
-            <div className="flex-1 min-h-[250px] relative border-t border-slate-800">
-               <VectorMap 
-                  currentPosition={currentPosition}
-                  destinations={DESTINATIONS}
-                  roads={ROADS}
-                  isNavigating={isNavigating}
-                  navigationProgress={navigationProgress}
-                  currentRoute={currentRoute}
-               />
-               <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur text-white px-3 py-1 rounded text-xs border border-slate-700">
-                  Live Satellite Feed
-               </div>
-            </div>
           </div>
           
           {/* --- 3D Viewport --- */}
-          <div className="col-span-3 bg-black flex flex-col relative">
-            <canvas ref={canvasRef} className="w-full h-full cursor-move" />
+          <div className="col-span-3 bg-black flex flex-col relative w-full">
+            <canvas ref={canvasRef} className="w-full h-[100px] block cursor-move" />
             
             {/* Overlay UI */}
             <div className="absolute top-6 left-6 right-6 flex justify-between pointer-events-none">
@@ -565,6 +550,21 @@ const AutonomousBlog = () => {
                     {isNavigating ? "Autonomous Mode Active..." : "Vehicle Parked"}
                  </span>
             </div>
+          {/* --- 2D Vector Map Under 3D View --- */}
+          <div className="w-full border-t border-slate-800 bg-[#0f1419] h-[300px] overflow-hidden relative">
+            <VectorMap
+              currentPosition={currentPosition}
+              destinations={DESTINATIONS}
+              roads={ROADS}
+              isNavigating={isNavigating}
+              navigationProgress={navigationProgress}
+              currentRoute={currentRoute}
+            />
+            <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur text-white px-3 py-1 rounded text-xs border border-slate-700">
+              Live Satellite Feed
+            </div>
+          </div>
+
           </div>
 
         </div>

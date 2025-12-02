@@ -177,7 +177,14 @@ const AutonomousBlog = () => {
   const [selectedDestination, setSelectedDestination] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
-  const [currentRoute, setCurrentRoute] = useState({path: []});
+  const [currentRoute, setCurrentRoute] = useState<{
+    path: { x: number; z: number }[];
+    destination: any | null;
+  }>({
+    path: [],
+    destination: null
+  });
+
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const carRef = useRef(null);

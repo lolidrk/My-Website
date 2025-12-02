@@ -489,7 +489,7 @@ ROADS.forEach(road => {
     // ... Content remains the same, just keeping it concise for this block
     const content = {
         home: { title: 'Welcome Home', body: <p className="text-gray-300">Central hub for autonomous research.</p> },
-        publications: { title: 'Publications', body: <p className="text-gray-300">Latest research papers and journals.</p> },
+        publications: { title: 'Mitigating SSRF Threats: Integrating ML and Network Architecture', body: <p className="text-gray-300">Server Side Request Forgery (SSRF) is a vulnerability that when exploited, allows the attacker to manipulate the server into making requests to the organization’s internal network. In this research, we explore the various consequences of SSRF and introduce a system which integrates an Intrusion Detection System (IDS) and Intrusion Prevention System (IPS) with a dedicated helper server implemented using Nginx. Machine learning models, including XGBoost, are employed for threat detection, achieving high accuracy (98.55%) in classifying URLs as benign or malicious. The study highlights the efficacy of the proposed approach in mitigating SSRF threats, showcasing the importance of integrating machine learning with network security for robust threat detection and prevention. The practical implications of this approach include enhanced system security, reduced vulnerabilities to SSRF attacks, and improved defense mechanisms against malicious URL requests. Github Link: https://github.com/lolidrk/SSRF_Framework.git</p> },
         blog: { title: 'Blog Tower', body: <p className="text-gray-300">Technical deep dives and tutorials.</p> },
         about: { title: 'About Plaza', body: <p className="text-gray-300">Portfolio and contact information.</p> }
     };

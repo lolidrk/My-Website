@@ -3,13 +3,38 @@ import { FileText, BookOpen, User, Home, Navigation2, MapPin, Layers, Compass } 
 import * as THREE from 'three';
 
 // --- Configuration Constants ---
+// --- Configuration Constants ---
+// Define a loop of road nodes: 8 points forming a square/octagon loop
+const ROAD_NODES = [
+  { x: -60, z: -60 }, // 0: Top-Left
+  { x: 0,   z: -60 }, // 1: Top-Mid
+  { x: 60,  z: -60 }, // 2: Top-Right
+  { x: 60,  z: 0   }, // 3: Right-Mid
+  { x: 60,  z: 60  }, // 4: Bottom-Right
+  { x: 0,   z: 60  }, // 5: Bottom-Mid
+  { x: -60, z: 60  }, // 6: Bottom-Left
+  { x: -60, z: 0   }, // 7: Left-Mid
+];
+
+const ROADS = [
+  { from: ROAD_NODES[0], to: ROAD_NODES[1] },
+  { from: ROAD_NODES[1], to: ROAD_NODES[2] },
+  { from: ROAD_NODES[2], to: ROAD_NODES[3] },
+  { from: ROAD_NODES[3], to: ROAD_NODES[4] },
+  { from: ROAD_NODES[4], to: ROAD_NODES[5] },
+  { from: ROAD_NODES[5], to: ROAD_NODES[6] },
+  { from: ROAD_NODES[6], to: ROAD_NODES[7] },
+  { from: ROAD_NODES[7], to: ROAD_NODES[0] },
+];
+
 const DESTINATIONS = [
   { 
     id: 'home', 
     name: 'Home Base', 
     icon: Home, 
     coords: { lat: 12.9698, lng: 77.7500 },
-    position3D: { x: 0, z: 0 },
+    position3D: { x: -80, z: -60 }, // Outside Top-Left
+    entryNodeIdx: 0, // Connects to Node 0
     color: '#3b82f6',
     buildingColor: 0x3b82f6,
     height: 8
@@ -19,7 +44,8 @@ const DESTINATIONS = [
     name: 'Publications Hub', 
     icon: FileText, 
     coords: { lat: 12.9850, lng: 77.7300 },
-    position3D: { x: -50, z: -50 },
+    position3D: { x: 80, z: -60 }, // Outside Top-Right
+    entryNodeIdx: 2, // Connects to Node 2
     color: '#10b981',
     buildingColor: 0x10b981,
     height: 15
@@ -29,7 +55,8 @@ const DESTINATIONS = [
     name: 'Blog Tower', 
     icon: BookOpen, 
     coords: { lat: 12.9520, lng: 77.7650 },
-    position3D: { x: 50, z: 50 },
+    position3D: { x: 80, z: 60 }, // Outside Bottom-Right
+    entryNodeIdx: 4, // Connects to Node 4
     color: '#f59e0b',
     buildingColor: 0xf59e0b,
     height: 12
@@ -39,25 +66,17 @@ const DESTINATIONS = [
     name: 'About Plaza', 
     icon: User, 
     coords: { lat: 12.9600, lng: 77.7400 },
-    position3D: { x: -40, z: 40 },
+    position3D: { x: -80, z: 60 }, // Outside Bottom-Left
+    entryNodeIdx: 6, // Connects to Node 6
     color: '#8b5cf6',
     buildingColor: 0x8b5cf6,
     height: 10
   },
 ];
 
-const ROADS = [
-  { from: { x: 0, z: 0 }, to: { x: -50, z: -50 } },
-  { from: { x: 0, z: 0 }, to: { x: 50, z: 50 } },
-  { from: { x: 0, z: 0 }, to: { x: -40, z: 40 } },
-  { from: { x: -50, z: -50 }, to: { x: 50, z: 50 } },
-  { from: { x: 50, z: 50 }, to: { x: -40, z: 40 } },
-  { from: { x: -40, z: 40 }, to: { x: -50, z: -50 } },
-];
-
 // --- Vector Map Component ---
 const VectorMap = ({ currentPosition, destinations, roads, isNavigating, navigationProgress, currentRoute }) => {
-  const viewBoxSize = 140; 
+  const viewBoxSize = 200; // Increased view box
   const offset = viewBoxSize / 2;
 
   // Calculate dynamic car position for the 2D map
@@ -199,11 +218,11 @@ const AutonomousBlog = () => {
     if (!canvasRef.current) return;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x1a1a2e, 80, 200);
+    scene.fog = new THREE.Fog(0x1a1a2e, 80, 300); // Increased fog distance
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 300);
-    camera.position.set(0, 15, 25); // Higher angle for better view
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 500);
+    camera.position.set(0, 40, 60); // Higher and further back
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -223,12 +242,18 @@ const AutonomousBlog = () => {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(50, 80, 50);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
     scene.add(directionalLight);
 
     // Ground
-    const groundGeometry = new THREE.PlaneGeometry(300, 300);
+    const groundGeometry = new THREE.PlaneGeometry(500, 500);
     const groundMaterial = new THREE.MeshStandardMaterial({ 
       color: 0x0f1419,
       roughness: 0.95,
@@ -239,41 +264,43 @@ const AutonomousBlog = () => {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const gridHelper = new THREE.GridHelper(300, 60, 0x1a4d6f, 0x0d2433);
+    const gridHelper = new THREE.GridHelper(500, 100, 0x1a4d6f, 0x0d2433);
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
     // Roads
-    const roadWidth = 6;
-    const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });
+    const roadWidth = 8;
+    const textureLoader = new THREE.TextureLoader();
+    const roadTexture = textureLoader.load('/assets/bigger_road.png');
+    roadTexture.wrapS = THREE.RepeatWrapping;
+    roadTexture.wrapT = THREE.RepeatWrapping;
+    
+    const roadMaterial = new THREE.MeshStandardMaterial({ 
+      map: roadTexture,
+      transparent: true,
+      roughness: 1.0
+    });
 
-// Now build each road mesh using this material
-ROADS.forEach(road => {
-  const dx = road.to.x - road.from.x;
-  const dz = road.to.z - road.from.z;
-  const length = Math.sqrt(dx * dx + dz * dz);
-  const angle = Math.atan2(dx, dz);
+    ROADS.forEach(road => {
+      const dx = road.to.x - road.from.x;
+      const dz = road.to.z - road.from.z;
+      const length = Math.sqrt(dx * dx + dz * dz);
+      const angle = Math.atan2(dx, dz);
 
-      const roadMesh = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, length), roadMaterial);
+      // Calculate texture repeat for consistent road appearance
+      const repeatY = length / roadWidth;
+      const geometry = new THREE.PlaneGeometry(roadWidth, length);
+      const material = roadMaterial.clone();
+      material.map = roadTexture.clone();
+      material.map.repeat.set(1, repeatY);
+      material.map.needsUpdate = true;
+
+      const roadMesh = new THREE.Mesh(geometry, material);
       roadMesh.rotation.x = -Math.PI / 2;
       roadMesh.rotation.z = -angle;
       roadMesh.position.set((road.from.x + road.to.x)/2, 0.02, (road.from.z + road.to.z)/2);
       roadMesh.receiveShadow = true;
       scene.add(roadMesh);
-
-      // Road Markings
-      const segments = Math.floor(length / 6);
-      for(let i=0; i<segments; i++) {
-          const t = i/segments;
-          const mark = new THREE.Mesh(
-              new THREE.PlaneGeometry(0.3, 3), 
-              new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.8})
-          );
-          mark.rotation.x = -Math.PI/2;
-          mark.rotation.z = -angle;
-          mark.position.set(road.from.x + dx*t, 0.03, road.from.z + dz*t);
-          scene.add(mark);
-      }
     });
 
     // Buildings
@@ -281,7 +308,7 @@ ROADS.forEach(road => {
       const group = new THREE.Group();
       
       // Main Building
-      const bGeo = new THREE.BoxGeometry(8, dest.height, 8);
+      const bGeo = new THREE.BoxGeometry(10, dest.height, 10);
       const bMat = new THREE.MeshStandardMaterial({ color: dest.buildingColor, roughness: 0.7 });
       const building = new THREE.Mesh(bGeo, bMat);
       building.position.y = dest.height / 2;
@@ -294,26 +321,36 @@ ROADS.forEach(road => {
               new THREE.BoxGeometry(0.6, 0.6, 0.1),
               new THREE.MeshStandardMaterial({color: 0x60a5fa, emissive: 0x60a5fa, emissiveIntensity: 0.5})
           );
-          w.position.set(2, dest.height - 3 - (i*2), 4.05);
+          w.position.set(2, dest.height - 3 - (i*2), 5.05);
           group.add(w);
       }
 
-      // Parking Spot (Important for navigation logic)
-      const pGeo = new THREE.PlaneGeometry(3, 5);
+      // Parking Spot
+      const pGeo = new THREE.PlaneGeometry(5, 8);
       const pMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a });
       const parking = new THREE.Mesh(pGeo, pMat);
       parking.rotation.x = -Math.PI / 2;
-      parking.position.set(0, 0.02, 8); // Parking is always at Z+8 relative to building
+      parking.position.set(0, 0.02, 10); // Parking is at Z+10 relative to building
       group.add(parking);
 
-      // Connect parking to road visual
-      const connGeo = new THREE.PlaneGeometry(3, 3);
+      // Connect parking to road visual (Driveway)
+      // We need to connect the parking spot (local 0,0,10) to the road node (global ROAD_NODES[dest.entryNodeIdx])
+      // Since the building is at dest.position3D, we can calculate the vector to the road node
+      
+      // For simplicity, we just add a small connector locally
+      const connGeo = new THREE.PlaneGeometry(4, 6);
       const conn = new THREE.Mesh(connGeo, pMat);
       conn.rotation.x = -Math.PI/2;
-      conn.position.set(0, 0.02, 5);
+      conn.position.set(0, 0.02, 14);
       group.add(conn);
 
       group.position.set(dest.position3D.x, 0, dest.position3D.z);
+      
+      // Rotate building to face the center or the road?
+      // Let's rotate them to face the center (0,0)
+      const angle = Math.atan2(dest.position3D.x, dest.position3D.z);
+      group.rotation.y = angle + Math.PI; // Face inward
+
       scene.add(group);
       buildingsRef.current.push(group);
     });
@@ -337,8 +374,20 @@ ROADS.forEach(road => {
     car.add(cabin);
 
     // Initial Position (Parked at Home)
-    // Home is (0,0), Parking is at (0,8)
-    car.position.set(0, 0.1, 8); 
+    // Home is at dest[0].position3D. Parking is +10 local Z (rotated)
+    // We need to calculate the global position of the parking spot
+    const home = DESTINATIONS[0];
+    const homeAngle = Math.atan2(home.position3D.x, home.position3D.z) + Math.PI;
+    const parkingOffset = new THREE.Vector3(0, 0, 10);
+    parkingOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), homeAngle);
+    
+    car.position.set(
+        home.position3D.x + parkingOffset.x,
+        0.1,
+        home.position3D.z + parkingOffset.z
+    );
+    car.rotation.y = homeAngle;
+
     carRef.current = car;
     scene.add(car);
 
@@ -364,44 +413,65 @@ ROADS.forEach(road => {
   }, []);
 
   // --- Improved Navigation Logic ---
-  // Calculates a strictly valid road path: Parking -> Hub -> Road -> Hub -> Parking
   const navigateTo = (destination) => {
     if (isNavigating || currentPosition.id === destination.id) return;
 
-    // 1. Start Point: Current Parking Spot
-    const startPos = { 
-        x: currentPosition.position3D.x, 
-        z: currentPosition.position3D.z + 8 
+    // Helper to get global parking position for a destination
+    const getParkingPos = (dest) => {
+        const angle = Math.atan2(dest.position3D.x, dest.position3D.z) + Math.PI;
+        const offset = new THREE.Vector3(0, 0, 10);
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+        return {
+            x: dest.position3D.x + offset.x,
+            z: dest.position3D.z + offset.z
+        };
     };
 
-    // 2. Start Hub: The "driveway" exit
-    const startHub = {
-        x: currentPosition.position3D.x,
-        z: currentPosition.position3D.z
-    };
+    const startParking = getParkingPos(currentPosition);
+    const endParking = getParkingPos(destination);
 
-    // 3. End Hub: The destination "driveway" entrance
-    const endHub = {
-        x: destination.position3D.x,
-        z: destination.position3D.z
-    };
+    const startNodeIdx = currentPosition.entryNodeIdx;
+    const endNodeIdx = destination.entryNodeIdx;
 
-    // 4. End Point: The destination Parking Spot
-    const endPos = {
-        x: destination.position3D.x,
-        z: destination.position3D.z + 8
-    };
+    // Calculate path along the loop
+    // We can go clockwise or counter-clockwise. Let's pick the shortest.
+    const numNodes = ROAD_NODES.length;
+    let cwDist = (endNodeIdx - startNodeIdx + numNodes) % numNodes;
+    let ccwDist = (startNodeIdx - endNodeIdx + numNodes) % numNodes;
 
-    // Build the path sequence
-    // Note: Since our road network is fully connected (K4 graph), we can drive directly between hubs
+    let roadPath = [];
+    if (cwDist <= ccwDist) {
+        // Go Clockwise
+        for (let i = 0; i <= cwDist; i++) {
+            roadPath.push(ROAD_NODES[(startNodeIdx + i) % numNodes]);
+        }
+    } else {
+        // Go Counter-Clockwise
+        for (let i = 0; i <= ccwDist; i++) {
+            roadPath.push(ROAD_NODES[(startNodeIdx - i + numNodes) % numNodes]);
+        }
+    }
+
+    // Full Path: StartParking -> StartNode -> ... RoadNodes ... -> EndNode -> EndParking
     const routePath = [
-        startPos,   // 0. Start at parking
-        startHub,   // 1. Pull out to main node
-        endHub,     // 2. Drive to destination node
-        endPos      // 3. Pull into parking
+        startParking,
+        ROAD_NODES[startNodeIdx],
+        ...roadPath.slice(1, -1), // Skip first (StartNode) and last (EndNode) to avoid dupes if we want, but actually we need them all
+        // Wait, roadPath includes startNode and endNode.
+        // So we just need to insert them.
+        // Actually, let's just use roadPath as is.
+        // But we need to connect parking to the node.
+    ];
+    
+    // Refined Path:
+    const finalPath = [
+        startParking,
+        ROAD_NODES[startNodeIdx],
+        ...roadPath.slice(1), // roadPath[0] is startNode, already added
+        endParking
     ];
 
-    setCurrentRoute({ path: routePath, destination });
+    setCurrentRoute({ path: finalPath, destination });
     setIsNavigating(true);
     setCurrentPosition(destination);
   };

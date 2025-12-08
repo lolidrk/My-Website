@@ -70,7 +70,8 @@ const DESTINATIONS = [
     entryNodeIdx: 6, // Connects to Node 6
     color: '#8b5cf6',
     buildingColor: 0x8b5cf6,
-    height: 10
+    height: 10,
+    email: 'kalyanikulkarni2002@gmail.com'
   },
 ];
 
@@ -559,10 +560,50 @@ const AutonomousBlog = () => {
     // ... Content remains the same, just keeping it concise for this block
     const content = {
         home: { title: 'Welcome Home', body: <p className="text-gray-300">Central hub for autonomous research.</p> },
-        publications: { title: 'Mitigating SSRF Threats: Integrating ML and Network Architecture', body: <p className="text-gray-300">Server Side Request Forgery (SSRF) is a vulnerability that when exploited, allows the attacker to manipulate the server into making requests to the organization’s internal network. In this research, we explore the various consequences of SSRF and introduce a system which integrates an Intrusion Detection System (IDS) and Intrusion Prevention System (IPS) with a dedicated helper server implemented using Nginx. Machine learning models, including XGBoost, are employed for threat detection, achieving high accuracy (98.55%) in classifying URLs as benign or malicious. The study highlights the efficacy of the proposed approach in mitigating SSRF threats, showcasing the importance of integrating machine learning with network security for robust threat detection and prevention. The practical implications of this approach include enhanced system security, reduced vulnerabilities to SSRF attacks, and improved defense mechanisms against malicious URL requests. Github Link: https://github.com/lolidrk/SSRF_Framework.git</p> },
-        blog: { title: 'Blog Tower', body: <p className="text-gray-300">Technical deep dives and tutorials.</p> },
-        about: { title: 'About Plaza', body: <p className="text-gray-300">Portfolio and contact information.</p> }
-    };
+        publications: {
+  title: 'Mitigating SSRF Threats: Integrating ML and Network Architecture',
+  body: (
+    <div className="text-gray-300">
+      <p>
+        Server Side Request Forgery (SSRF) is a vulnerability that when exploited,
+        allows the attacker to manipulate the server into making requests to the
+        organization's internal network. In this research, we explore the various
+        consequences of SSRF and introduce a system which integrates an Intrusion
+        Detection System (IDS) and Intrusion Prevention System (IPS) with a 
+        dedicated helper server implemented using Nginx. Machine learning models, 
+        including XGBoost, are employed for threat detection, achieving high 
+        accuracy (98.55%) in classifying URLs as benign or malicious. The study 
+        highlights the efficacy of the proposed approach in mitigating SSRF threats.
+      </p>
+
+      <a
+        href="https://link.springer.com/chapter/10.1007/978-981-97-8669-5_1#citeas"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white">
+          Read Paper
+        </button>
+      </a>
+    </div>
+  )
+},
+blog: {
+  title: 'How LiDARs Really Work (and Why They Don’t Shoot Lasers at Your Face)',
+  body: (
+    <p className="text-gray-300">
+      A fun, slightly dramatic deep dive into the sensors that help cars “see”
+      — minus the sci-fi laser battles Hollywood promised us.
+    </p>
+  )
+},
+about: { title: 'About Plaza', body: <p className="text-gray-300">
+  I'm Kalyani — a machine learning enthusiast with a habit of turning complex problems into things that actually work (most of the time). My interests sit at the intersection of Computer Vision, autonomous systems, and safety-critical AI, especially making advanced driver-assistance features as universal as seatbelts, not luxury add-ons.
+  I've worked on everything from 3D scene reconstruction and Gaussian splatting to real-time visualization of HD maps and LiDAR data. Recently, I've been part of a team building a full-scale environment visualization system for autonomous vehicles, where I focus on rendering static structures like buildings and trees. (If it doesn't move, I make it look good.)
+  When I'm not elbow-deep in sensor fusion, Transformers, or regression models, I'm usually learning languages, watching Spy x Family, or attempting to develop chess intuition without blundering my queen.
+  I like building things that are fast, reliable, and safe — whether that's a predictive model or a visualization pipeline — and I enjoy solving problems that don't come with a neat answer at the back of the book.
+  If you're interested in collaborating on CV, robotics, or anything that involves turning data into decisions, feel free to reach out at kalyanikulkarni2002@gmail.com</p> }
+  };
     return content[selectedDestination.id] || { title: '', body: null };
   };
 

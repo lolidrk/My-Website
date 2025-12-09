@@ -482,7 +482,7 @@ const AutonomousBlog = () => {
     if (!isNavigating || currentRoute.path.length === 0) return;
 
     const SPEED = 1; // Units per frame approx
-    const ROTATION_SPEED = 0.4;
+    const ROTATION_SPEED = 0.1;
     let currentSegmentIndex = 0;
     let animId;
 

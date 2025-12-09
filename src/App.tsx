@@ -481,8 +481,8 @@ const AutonomousBlog = () => {
   useEffect(() => {
     if (!isNavigating || currentRoute.path.length === 0) return;
 
-    const SPEED = 0.4; // Units per frame approx
-    const ROTATION_SPEED = 0.1;
+    const SPEED = 1; // Units per frame approx
+    const ROTATION_SPEED = 0.4;
     let currentSegmentIndex = 0;
     let animId;
 

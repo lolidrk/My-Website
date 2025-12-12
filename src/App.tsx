@@ -242,7 +242,7 @@ const AutonomousBlog = () => {
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(50, 80, 50);
-    directionalLight.castShadow = true;
+    directionalLight.castShadow = false;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
@@ -415,7 +415,12 @@ const AutonomousBlog = () => {
 
   // --- Improved Navigation Logic ---
   const navigateTo = (destination) => {
-    if (isNavigating || currentPosition.id === destination.id) return;
+    if (isNavigating) return;
+    if (currentPosition.id == destination.id)
+    {
+      setSelectedDestination(destination);
+      return;
+    }
 
     // Helper to get global parking position for a destination
     const getParkingPos = (dest) => {
@@ -630,7 +635,7 @@ about: { title: 'About Plaza', body: <p className="text-gray-300">
                 <button
                   key={dest.id}
                   onClick={() => navigateTo(dest)}
-                  disabled={isNavigating || currentPosition.id === dest.id}
+                  disabled={isNavigating}
                   className={`w-full px-4 py-4 text-left rounded-xl transition-all border border-slate-700 flex items-center gap-4 group
                     ${currentPosition.id === dest.id ? 'bg-slate-800 border-blue-500/50' : 'hover:bg-slate-800 hover:border-slate-600'}
                     ${isNavigating ? 'opacity-50 cursor-not-allowed' : ''}
@@ -651,7 +656,7 @@ about: { title: 'About Plaza', body: <p className="text-gray-300">
           
           {/* --- 3D Viewport --- */}
           <div className="col-span-3 bg-black flex flex-col relative w-full">
-            <canvas ref={canvasRef} className="w-full h-[100px] block cursor-move" />
+            <canvas ref={canvasRef} className="w-full h-[100px] block cursor-default" />
             
             {/* Overlay UI */}
             <div className="absolute top-6 left-6 right-6 flex justify-between pointer-events-none">

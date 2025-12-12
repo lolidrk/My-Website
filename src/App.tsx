@@ -195,7 +195,7 @@ const VectorMap = ({ currentPosition, destinations, roads, isNavigating, navigat
 
 
 const AutonomousBlog = () => {
-  const [selectedDestination, setSelectedDestination] = useState(null);
+  const [selectedDestination, setSelectedDestination] = useState(DESTINATIONS[0]);
   const [selectedBlogPost, setSelectedBlogPost] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
@@ -763,8 +763,49 @@ const AutonomousBlog = () => {
     if (!selectedDestination) return null;
     // ... Content remains the same, just keeping it concise for this block
     const content = {
-        home: { title: 'Welcome Home', body: <p className="text-gray-300">Central hub for autonomous research.</p> },
-        publications: {
+        home: { title: 'Mission Control', body: (
+          <div className="space-y-6">
+            <p className="text-gray-300 text-lg leading-relaxed">
+              Welcome to my autonomous portfolio. This interface represents a living digital twin of my work in machine learning and computer vision.
+            </p>
+
+            <div className="bg-slate-800/60 p-5 rounded-xl border border-slate-700">
+              <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                <Navigation2 className="w-5 h-5 text-blue-400" />
+                Navigation Protocols
+              </h3>
+              <ul className="space-y-3 text-gray-300">
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">1</span>
+                  <span>Select a destination from the <strong>Control Center</strong> on the left (Publications, Blog, or About).</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">2</span>
+                  <span>The vehicle will autonomously pathfind and drive to the selected building in the 3D view.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">3</span>
+                  <span>Upon arrival, the details for that section will automatically appear here.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="text-sm p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-200/80">
+              <strong className="text-yellow-500 block mb-1 flex items-center gap-2">
+                <Layers className="w-4 h-4"/> Performance Note
+              </strong>
+              <p className="opacity-80 mb-2">
+                This website runs a real-time 3D physics engine directly in your browser. 
+              </p>
+              <ul className="list-disc list-inside space-y-1 opacity-70 ml-1">
+                <li>If the animation feels sluggish, please ensure <strong>Hardware Acceleration</strong> is enabled in your browser settings.</li>
+                <li>Performance may be lower on devices with integrated graphics or in battery-saver mode.</li>
+              </ul>
+            </div>
+          </div>
+        ) 
+      },
+  publications: {
   title: 'Mitigating SSRF Threats: Integrating ML and Network Architecture',
   body: (
     <div className="text-gray-300">
@@ -796,12 +837,38 @@ blog: {
   title: 'Blog Tower',
   body: null
 },
-about: { title: 'About Plaza', body: <p className="text-gray-300">
-  I'm Kalyani — a machine learning enthusiast with a habit of turning complex problems into things that actually work (most of the time). My interests sit at the intersection of Computer Vision, autonomous systems, and safety-critical AI, especially making advanced driver-assistance features as universal as seatbelts, not luxury add-ons.
-  I've worked on everything from 3D scene reconstruction and Gaussian splatting to real-time visualization of HD maps and LiDAR data. Recently, I've been part of a team building a full-scale environment visualization system for autonomous vehicles, where I focus on rendering static structures like buildings and trees. (If it doesn't move, I make it look good.)
-  When I'm not elbow-deep in sensor fusion, Transformers, or regression models, I'm usually learning languages, watching Spy x Family, or attempting to develop chess intuition without blundering my queen.
-  I like building things that are fast, reliable, and safe — whether that's a predictive model or a visualization pipeline — and I enjoy solving problems that don't come with a neat answer at the back of the book.
-  If you're interested in collaborating on CV, robotics, or anything that involves turning data into decisions, feel free to reach out at kalyanikulkarni2002@gmail.com</p> }
+about: {
+  title: 'About Plaza',
+  body: (
+    <p className="text-gray-300">
+      I'm Kalyani — a machine learning enthusiast with a habit of turning complex problems into things that actually work (most of the time). 
+      My interests sit at the intersection of Computer Vision, autonomous systems, and safety-critical AI, especially making advanced 
+      driver-assistance features as universal as seatbelts, not luxury add-ons.
+      <br /><br />
+      I've worked on everything from 3D scene reconstruction and Gaussian splatting to real-time visualization of HD maps and LiDAR data. 
+      Recently, I've been part of a team building a full-scale environment visualization system for autonomous vehicles, where I focus on 
+      rendering static structures like buildings and trees. (If it doesn't move, I make it look good.)
+      <br /><br />
+      When I'm not elbow-deep in sensor fusion, Transformers, or regression models, I'm usually learning languages, watching Spy x Family, 
+      or attempting to develop chess intuition without blundering my queen.
+      <br /><br />
+      I like building things that are fast, reliable, and safe — whether that's a predictive model or a visualization pipeline — and I enjoy 
+      solving problems that don't come with a neat answer at the back of the book.
+      <br /><br />
+      If you're interested in collaborating on CV, robotics, or anything that involves turning data into decisions, feel free to reach out 
+      at kalyanikulkarni2002@gmail.com.
+      <br /><br />
+      <a 
+        href="https://drive.google.com/file/d/1ObAfUlCZxJTFjtayz1PFJjWL0vS4abp_/view?usp=drive_link"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-400 underline hover:text-blue-300"
+      >
+        View my résumé
+      </a>
+    </p>
+  )
+}
   };
     return content[selectedDestination.id] || { title: '', body: null };
   };

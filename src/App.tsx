@@ -271,11 +271,22 @@ const AutonomousBlog = () => {
           insects), cluster points into objects, track those objects over time, and predict where they're going 
           — all in real-time, because the car is moving at 60 mph and needs to make decisions <em>now</em>.
         </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is where sensor fusion comes in. LiDAR gives you the geometry, cameras give you texture and 
+          semantics (like reading traffic lights), and radar gives you velocity. Combine all three, and you've 
+          got a pretty solid understanding of the world.
+        </p>
 
         <h3 className="text-xl font-bold text-white mt-6 mb-3">The Future of LiDAR</h3>
         <p className="text-gray-300 leading-relaxed mb-4">
           Early LiDAR units cost $75,000 and looked like giant rotating buckets. Now? You can get solid-state 
           LiDAR for under $1,000, and they're getting smaller, cheaper, and more capable every year.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Some companies (looking at you, Tesla) are betting that cameras alone can solve autonomous driving. 
+          Others think LiDAR is essential. Personally? I think the debate misses the point. It's not about which 
+          sensor is "better" — it's about building systems that are redundant, robust, and safe. And right now, 
+          LiDAR is one of the best tools we have for that.
         </p>
         <p className="text-gray-300 leading-relaxed">
           So next time you see a self-driving car with that spinning sensor on top, give it a little nod of 
@@ -311,6 +322,10 @@ const AutonomousBlog = () => {
           standing in the middle of the road instead of on the sidewalk. And now your car is slamming on the brakes 
           for no reason.
         </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Oh, and this calibration? It can drift over time due to vibrations, temperature changes, or just normal 
+          wear and tear. So you need mechanisms to detect and correct for miscalibration automatically. Fun times.
+        </p>
 
         <h3 className="text-xl font-bold text-white mt-6 mb-3">Timing is Everything</h3>
         <p className="text-gray-300 leading-relaxed mb-4">
@@ -321,7 +336,13 @@ const AutonomousBlog = () => {
         <p className="text-gray-300 leading-relaxed mb-4">
           Why does this matter? Because a car moving at 60 mph (about 27 m/s) covers almost 3 meters in just 100 
           milliseconds. If your sensors are out of sync by even that small amount, you're fusing stale data — trying 
-          to combine a LiDAR measurement from 100ms ago with a camera frame from right now.
+          to combine a LiDAR measurement from 100ms ago with a camera frame from right now. The car you detected? 
+          It's not actually where you think it is anymore.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          The solution is temporal alignment: you need to interpolate or extrapolate sensor data to a common 
+          timestamp. But interpolation introduces uncertainty. And extrapolation? That's just guessing with 
+          extra steps.
         </p>
 
         <h3 className="text-xl font-bold text-white mt-6 mb-3">The Association Problem</h3>
@@ -330,19 +351,60 @@ const AutonomousBlog = () => {
           how do you know that the object detected by the camera is the same object detected by the LiDAR?
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          This is called the data association problem. The camera might see a car and a pedestrian. The LiDAR might 
-          see three distinct clusters of points. The radar might detect two moving targets. Which detection corresponds to which?
-          If you get it wrong, you fuse a pedestrian with a lamppost, creating a ghost object.
+          This is called the data association problem, and it's harder than it sounds. The camera might see a car 
+          and a pedestrian. The LiDAR might see three distinct clusters of points. The radar might detect two moving 
+          targets. Which detection corresponds to which?
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          You can use algorithms like the Hungarian algorithm or Joint Probabilistic Data Association (JPDA) to 
+          solve this, but they're computationally expensive. And if you get it wrong? Congrats, you just fused a 
+          pedestrian with a lamppost, and now your perception stack thinks there's a 7-foot-tall object that's both 
+          stationary and moving at the same time.
         </p>
 
         <h3 className="text-xl font-bold text-white mt-6 mb-3">Conflicting Information</h3>
         <p className="text-gray-300 leading-relaxed mb-4">
-          Even when aligned, sensors disagree. The camera says there's a car 20 meters ahead. The LiDAR says 21 meters. 
-          The radar says 19.5 meters. Which one is right?
+          Even when everything is aligned and associated correctly, sensors can disagree. The camera says there's 
+          a car 20 meters ahead. The LiDAR says 21 meters. The radar says 19.5 meters. Which one is right?
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          This is where algorithms like Kalman filters come in—they weigh the reliability of each sensor (its covariance) 
-          to produce a fused estimate that is mathematically more likely to be true than any single sensor's reading.
+          This is where you need robust fusion algorithms — typically Kalman filters or particle filters — that 
+          can weigh the reliability of each sensor and produce a fused estimate. But these filters need to know 
+          how much to trust each sensor, which depends on environmental conditions. LiDAR is great in clear weather 
+          but struggles in heavy rain. Cameras are useless at night without good lighting. Radar is consistent but 
+          has low resolution.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          So now you need adaptive fusion: dynamically adjusting trust levels based on context. And that's a whole 
+          other research problem.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">Computational Constraints</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Oh, and did I mention you have to do all of this in real-time, on embedded hardware, with limited power 
+          and cooling? A typical autonomous vehicle might process gigabytes of sensor data per second. You can't 
+          just throw a server rack in the trunk.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This means optimizing algorithms, parallelizing computations, and making hard trade-offs between accuracy 
+          and latency. Sometimes "good enough" in 50 milliseconds is better than "perfect" in 200 milliseconds — 
+          because by the time you finish computing, the world has already changed.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">So Why Bother?</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Because when done right, sensor fusion is <em>incredible</em>. You get the best of all worlds: the 
+          resolution of cameras, the precision of LiDAR, and the velocity measurements of radar. You get redundancy, 
+          so if one sensor fails, the others can compensate. You get robustness across different weather conditions 
+          and lighting scenarios.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          It's hard. Really hard. But it's also one of the most important problems in autonomous driving. Because 
+          at the end of the day, fusing sensors isn't just about making better maps or tracking objects more 
+          accurately. It's about building systems that are safe enough to trust with human lives.
+        </p>
+        <p className="text-gray-300 leading-relaxed">
+          And that's worth the effort.
         </p>
       </div>
     )

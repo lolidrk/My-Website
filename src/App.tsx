@@ -196,6 +196,7 @@ const VectorMap = ({ currentPosition, destinations, roads, isNavigating, navigat
 
 const AutonomousBlog = () => {
   const [selectedDestination, setSelectedDestination] = useState(null);
+  const [selectedBlogPost, setSelectedBlogPost] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
   const [currentRoute, setCurrentRoute] = useState<{
@@ -213,6 +214,202 @@ const AutonomousBlog = () => {
   const buildingsRef = useRef([]);
 
   const [currentPosition, setCurrentPosition] = useState(DESTINATIONS[0]);
+
+  const blogPosts = [
+  {
+    id: 1,
+    title: "How LiDARs Really Work (and Why They Don't Shoot Lasers at Your Face)",
+    date: "December 2024",
+    preview: "A fun, slightly dramatic deep dive into the sensors that help cars 'see' — minus the sci-fi laser battles Hollywood promised us.",
+    content: (
+      <div className="prose prose-invert max-w-none">
+        <p className="text-gray-300 text-lg leading-relaxed mb-4">
+          If you've ever wondered how self-driving cars "see" the world around them, the answer is probably sitting 
+          on top of the vehicle, spinning quietly like a tiny disco ball. That's LiDAR — Light Detection and Ranging — 
+          and it's basically giving the car superpowers.
+        </p>
+        
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">What Even Is LiDAR?</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          LiDAR works by shooting out laser pulses — millions of them per second — and measuring how long it takes 
+          for each pulse to bounce back. It's like echolocation for bats, except with light instead of sound. 
+          Each returning pulse tells the sensor exactly how far away an object is, down to the centimeter.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          The result? A detailed 3D point cloud of everything around the vehicle: pedestrians, other cars, trees, 
+          road signs, that random shopping cart someone left in the parking lot. It updates in real-time, giving 
+          the car a constantly refreshed map of its surroundings.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">But Wait, Isn't a Laser Dangerous?</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Great question. And the answer is: not really. Automotive LiDAR uses infrared light at wavelengths 
+          around 905nm or 1550nm, which are classified as Class 1 lasers. That's the same safety rating as your 
+          TV remote or a barcode scanner at the grocery store.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          The power is distributed across a wide field of view, and the pulses are incredibly brief. So no, 
+          the self-driving car rolling past you isn't going to accidentally laser your retina. Hollywood lied 
+          to us (again).
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">Why Not Just Use Cameras?</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Cameras are great — they're cheap, high-resolution, and can read street signs. But they struggle in 
+          low light, get confused by shadows, and can't directly measure distance. A white car in front of a 
+          white wall? Good luck with that.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          LiDAR doesn't care about lighting conditions. Rain? Works. Fog? Mostly works. Complete darkness? 
+          Still works. It gives you direct, precise depth information without having to infer it from pixels.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Real Challenge: Processing All That Data</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Here's the thing people don't talk about enough: a single LiDAR can generate millions of points per 
+          second. That's a massive amount of data. You need to filter out noise (reflections from rain, dust, 
+          insects), cluster points into objects, track those objects over time, and predict where they're going 
+          — all in real-time, because the car is moving at 60 mph and needs to make decisions <em>now</em>.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is where sensor fusion comes in. LiDAR gives you the geometry, cameras give you texture and 
+          semantics (like reading traffic lights), and radar gives you velocity. Combine all three, and you've 
+          got a pretty solid understanding of the world.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Future of LiDAR</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Early LiDAR units cost $75,000 and looked like giant rotating buckets. Now? You can get solid-state 
+          LiDAR for under $1,000, and they're getting smaller, cheaper, and more capable every year.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Some companies (looking at you, Tesla) are betting that cameras alone can solve autonomous driving. 
+          Others think LiDAR is essential. Personally? I think the debate misses the point. It's not about which 
+          sensor is "better" — it's about building systems that are redundant, robust, and safe. And right now, 
+          LiDAR is one of the best tools we have for that.
+        </p>
+        <p className="text-gray-300 leading-relaxed">
+          So next time you see a self-driving car with that spinning sensor on top, give it a little nod of 
+          respect. It's working hard to not run you over.
+        </p>
+      </div>
+    )
+  },
+  {
+    id: 2,
+    title: "Why Sensor Fusion is Harder Than It Sounds",
+    date: "November 2024",
+    preview: "Combining camera, radar, and LiDAR data sounds simple in theory. In practice, it's like conducting an orchestra where every instrument is playing a different song.",
+    content: (
+      <div className="prose prose-invert max-w-none">
+        <p className="text-gray-300 text-lg leading-relaxed mb-4">
+          Sensor fusion is one of those terms that sounds straightforward: you have multiple sensors, you combine 
+          their data, and boom — you get a better understanding of the world. Except in reality, it's more like 
+          trying to merge three different languages, spoken at different speeds, with different levels of accuracy, 
+          all while driving at highway speeds.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Coordinate System Problem</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Let's start with the basics. Every sensor on a vehicle has its own coordinate system. The camera sees 
+          the world in pixels. LiDAR measures distances in 3D space. Radar gives you range and velocity in polar 
+          coordinates. Before you can fuse anything, you need to transform all of this data into a common reference 
+          frame.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is called extrinsic calibration, and it needs to be <em>precise</em>. We're talking millimeter-level 
+          accuracy. If your LiDAR is off by just a few degrees, that pedestrian at 50 meters suddenly appears to be 
+          standing in the middle of the road instead of on the sidewalk. And now your car is slamming on the brakes 
+          for no reason.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Oh, and this calibration? It can drift over time due to vibrations, temperature changes, or just normal 
+          wear and tear. So you need mechanisms to detect and correct for miscalibration automatically. Fun times.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">Timing is Everything</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Here's another problem: your sensors don't all run at the same frequency. Your camera might capture frames 
+          at 30 Hz. Your LiDAR spins at 10 Hz. Your radar updates at 20 Hz. And your GPS? That's refreshing at 
+          1-10 Hz depending on the unit.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Why does this matter? Because a car moving at 60 mph (about 27 m/s) covers almost 3 meters in just 100 
+          milliseconds. If your sensors are out of sync by even that small amount, you're fusing stale data — trying 
+          to combine a LiDAR measurement from 100ms ago with a camera frame from right now. The car you detected? 
+          It's not actually where you think it is anymore.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          The solution is temporal alignment: you need to interpolate or extrapolate sensor data to a common 
+          timestamp. But interpolation introduces uncertainty. And extrapolation? That's just guessing with 
+          extra steps.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Association Problem</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Now let's say you've got everything calibrated and time-synced. Great! But here's the next challenge: 
+          how do you know that the object detected by the camera is the same object detected by the LiDAR?
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is called the data association problem, and it's harder than it sounds. The camera might see a car 
+          and a pedestrian. The LiDAR might see three distinct clusters of points. The radar might detect two moving 
+          targets. Which detection corresponds to which?
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          You can use algorithms like the Hungarian algorithm or Joint Probabilistic Data Association (JPDA) to 
+          solve this, but they're computationally expensive. And if you get it wrong? Congrats, you just fused a 
+          pedestrian with a lamppost, and now your perception stack thinks there's a 7-foot-tall object that's both 
+          stationary and moving at the same time.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">Conflicting Information</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Even when everything is aligned and associated correctly, sensors can disagree. The camera says there's 
+          a car 20 meters ahead. The LiDAR says 21 meters. The radar says 19.5 meters. Which one is right?
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is where you need robust fusion algorithms — typically Kalman filters or particle filters — that 
+          can weigh the reliability of each sensor and produce a fused estimate. But these filters need to know 
+          how much to trust each sensor, which depends on environmental conditions. LiDAR is great in clear weather 
+          but struggles in heavy rain. Cameras are useless at night without good lighting. Radar is consistent but 
+          has low resolution.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          So now you need adaptive fusion: dynamically adjusting trust levels based on context. And that's a whole 
+          other research problem.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">Computational Constraints</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Oh, and did I mention you have to do all of this in real-time, on embedded hardware, with limited power 
+          and cooling? A typical autonomous vehicle might process gigabytes of sensor data per second. You can't 
+          just throw a server rack in the trunk.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This means optimizing algorithms, parallelizing computations, and making hard trade-offs between accuracy 
+          and latency. Sometimes "good enough" in 50 milliseconds is better than "perfect" in 200 milliseconds — 
+          because by the time you finish computing, the world has already changed.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">So Why Bother?</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Because when done right, sensor fusion is <em>incredible</em>. You get the best of all worlds: the 
+          resolution of cameras, the precision of LiDAR, and the velocity measurements of radar. You get redundancy, 
+          so if one sensor fails, the others can compensate. You get robustness across different weather conditions 
+          and lighting scenarios.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          It's hard. Really hard. But it's also one of the most important problems in autonomous driving. Because 
+          at the end of the day, fusing sensors isn't just about making better maps or tracking objects more 
+          accurately. It's about building systems that are safe enough to trust with human lives.
+        </p>
+        <p className="text-gray-300 leading-relaxed">
+          And that's worth the effort.
+        </p>
+      </div>
+    )
+  }
+];
 
   // --- Three.js Setup ---
   useEffect(() => {
@@ -558,8 +755,10 @@ const AutonomousBlog = () => {
     return () => cancelAnimationFrame(animId);
   }, [isNavigating, currentRoute]);
 
-  const closeModal = () => setSelectedDestination(null);
-
+  const closeModal = () => {
+  setSelectedDestination(null);
+  setSelectedBlogPost(null);
+  };
   const renderContent = () => {
     if (!selectedDestination) return null;
     // ... Content remains the same, just keeping it concise for this block
@@ -594,13 +793,8 @@ const AutonomousBlog = () => {
   )
 },
 blog: {
-  title: 'How LiDARs Really Work (and Why They Don’t Shoot Lasers at Your Face)',
-  body: (
-    <p className="text-gray-300">
-      A fun, slightly dramatic deep dive into the sensors that help cars “see”
-      — minus the sci-fi laser battles Hollywood promised us.
-    </p>
-  )
+  title: 'Blog Tower',
+  body: null
 },
 about: { title: 'About Plaza', body: <p className="text-gray-300">
   I'm Kalyani — a machine learning enthusiast with a habit of turning complex problems into things that actually work (most of the time). My interests sit at the intersection of Computer Vision, autonomous systems, and safety-critical AI, especially making advanced driver-assistance features as universal as seatbelts, not luxury add-ons.
@@ -692,23 +886,59 @@ about: { title: 'About Plaza', body: <p className="text-gray-300">
       
       {/* Pop-up Modal */}
       {selectedDestination && !isNavigating && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={closeModal}>
-          <div className="bg-slate-900 rounded-2xl max-w-2xl w-full p-8 border border-slate-700 shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-                <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <selectedDestination.icon className="w-8 h-8" style={{ color: selectedDestination.color }} />
-                    {renderContent().title}
-                </h2>
-                <button onClick={closeModal} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={closeModal}>
+    <div className="bg-slate-900 rounded-2xl max-w-5xl w-full max-h-[85vh] border border-slate-700 shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+      
+      <div className="flex justify-between items-start p-8 pb-6 border-b border-slate-800">
+        <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+          <selectedDestination.icon className="w-8 h-8" style={{ color: selectedDestination.color }} />
+          {selectedDestination.id === 'blog' ? 'Blog Tower' : renderContent().title}
+        </h2>
+        <button onClick={closeModal} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="overflow-y-auto p-8 flex-1">
+        {selectedDestination.id === 'blog' ? (
+          selectedBlogPost ? (
+            <div>
+              <button onClick={() => setSelectedBlogPost(null)} className="mb-6 text-blue-400 hover:text-blue-300 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to all posts
+              </button>
+              <h3 className="text-2xl font-bold text-white mb-2">{selectedBlogPost.title}</h3>
+              <p className="text-gray-400 text-sm mb-6">{selectedBlogPost.date}</p>
+              {selectedBlogPost.content}
             </div>
-            <div className="prose prose-invert">
-                {renderContent().body}
+          ) : (
+            <div className="space-y-4">
+              {blogPosts.map(post => (
+                <div key={post.id} onClick={() => setSelectedBlogPost(post)}
+                  className="p-6 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-blue-500/50 hover:bg-slate-800 transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400">{post.title}</h3>
+                    <svg className="w-5 h-5 text-gray-500 group-hover:text-blue-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-400 text-sm mb-3">{post.date}</p>
+                  <p className="text-gray-300">{post.preview}</p>
+                </div>
+              ))}
             </div>
+          )
+        ) : (
+          <div className="prose prose-invert max-w-none">
+            {renderContent().body}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+    </div>
+    )}
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, BookOpen, User, Home, Navigation2, MapPin, Layers, Compass } from 'lucide-react';
 import * as THREE from 'three';
+import mcAfeeImage from '../src/assets/McAfeeThirthyFive.png'
+import thysRanst from '../src/assets/ThysRanst.png'
 
-// --- Configuration Constants ---
 // --- Configuration Constants ---
 // Define a loop of road nodes: 8 points forming a square/octagon loop
 const ROAD_NODES = [
@@ -417,14 +418,14 @@ const AutonomousBlog = () => {
     content: (
       <div className="prose prose-invert max-w-none">
         <p className="text-gray-300 text-lg leading-relaxed mb-4">
-          
           Imagine you are a state-of-the-art Deep Learning model. You have been trained on millions of images. 
           You can spot a pedestrian in a blizzard. You can distinguish a Chihuahua from a blueberry muffin. 
           But then, someone puts a small, specifically patterned sticker on a Stop sign.
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          To a human, it’s just a vandalized Stop sign. To you, the AI? It is now confidentially a "Speed Limit 45" sign. 
-          Welcome to the terrifying world of <strong>Adversarial Attacks</strong>.
+          To a human, it’s just a vandalized Stop sign. But to the model's internal mathematical representation, 
+          that sticker shifts the probability distribution just enough to flip the final classification. 
+          It is now confidentially a "Speed Limit 45" sign. Welcome to the terrifying world of <strong>Adversarial Attacks</strong>.
         </p>
 
         <h3 className="text-xl font-bold text-white mt-6 mb-3">It's Not Magic, It's Math</h3>
@@ -434,19 +435,82 @@ const AutonomousBlog = () => {
           decision boundary in the model's high-dimensional space.
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          It’s like whispering a secret code word that makes a highly trained guard dog suddenly think you are a cat.
-          The most famous example involves adding "noise" to a photo of a panda. To us, it still looks like a panda. To the AI, it is now a Gibbon with 99% confidence.
+          To understand <em>how</em> this happens, you have to look at the "Gradient." When we train an AI, we use the gradient to minimize error—essentially 
+          telling the model, "Change your parameters this way to get the right answer."
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          An attack works in reverse. The attacker asks the model, "How do I change this image's pixels to <strong>maximize</strong> the error?" 
+          The model's own math reveals the exact weak spots. The attacker then nudges the pixels in that specific direction. 
+          It is jujitsu for algorithms; using the model's own force against it.
+        </p>
+         
+        {/* --- IMAGE START --- */}
+        <figure className="float-right ml-6 mb-4 w-64">
+          <img 
+            src={mcAfeeImage} 
+            alt="McAfee research showing a 35 mph sign modified with tape to look like 85 mph to a computer vision system"
+            className="w-full rounded-lg shadow-lg border border-gray-700"
+          />
+          <figcaption className="text-center text-gray-400 text-sm mt-2">
+            Source: McAfee ATR. The Mobileye camera read this modified sign as "85 MPH".
+          </figcaption>
+        </figure>
+         {/* --- IMAGE END --- */}
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">The McAfee "Speed Limit" Hack</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Digital attacks are one thing, but physical attacks are scarier. In a famous study, researchers from McAfee ATR managed to fool a 
+          Tesla Model S (specifically the Mobileye EyeQ3 camera system) into accelerating autonomously.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          They didn't hack the software. They simply went to a hardware store. By placing a 2-inch strip of black electrical tape 
+          horizontally across the middle of the "3" on a "35 MPH" sign, they slightly elongated the center line. 
+          To a human, it still clearly looked like a 3. But to the computer vision algorithm, the specific arrangement of edges and contrast 
+          perfectly matched the statistical features of an "8".
         </p>
 
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The "Physical World" Threat</h3>
         <p className="text-gray-300 leading-relaxed mb-4">
-          Digital attacks are one thing, but physical attacks are scarier. Researchers from McAfee and others have demonstrated 
-          that simply extending the middle line of a "35 MPH" sign with black electrical tape can fool a Tesla's MobilEye camera 
-          into reading it as "85 MPH."
+          The car read the sign as "85 MPH" and the Traffic Aware Cruise Control (TACC) automatically accelerated the vehicle towards that speed. 
+          This proves that you don't need a supercomputer to crash a car; you just need to understand how the vision sensor extracts features.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Invisibility Cloak</h3>
+        {/* --- IMAGE START --- */}
+        <figure className="float-right ml-6 mb-4 w-64">
+          <img 
+            src={thysRanst} 
+            alt="An adversarial patch that is successfully able to hide persons from a person detector. Left: The person without a patch is successfully detected. Right: The person holding the patch is ignored."
+            className="w-full rounded-lg shadow-lg border border-gray-700"
+          />
+          <figcaption className="text-center text-gray-400 text-sm mt-2">
+            Source: Fooling automated surveillance cameras: adversarial patches to attack person detection.
+          </figcaption>
+        </figure>
+         {/* --- IMAGE END --- */}
+        <p className="text-gray-300 leading-relaxed mb-4">
+          It isn't just about making a Stop sign look like a Speed Limit sign. Sometimes, the goal is to make things disappear entirely.
+          Researchers (Thys et al.) developed "adversarial patches"—trippy, psychedelic patterns that look like abstract art to us.
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          This implies that a bad actor doesn't need to hack the car's software mainframe to cause an accident; they just need 
-          to visit Home Depot.
+          These patches effectively hack object detectors like <strong>YOLO (You Only Look Once)</strong>. 
+          YOLO divides an image into a grid and assigns an "objectness" score to each section. The adversarial patch is optimized to 
+          crush this objectness score.
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          When a person holds this printed patch over their stomach, the patch acts as a "salient" distractor. 
+          It overwhelms the neural network's activation map, causing the probability of the "Person" class to drop below the detection threshold. 
+          The bounding box simply vanishes. To the AI, the person has ceased to exist.
+        </p>
+
+        <h3 className="text-xl font-bold text-white mt-6 mb-3">Do Hackers Need the Source Code?</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          You might think, "Well, my model is proprietary and hidden on a server, so I'm safe." Unfortunately, not quite.
+          Attacks are split into <strong>White Box</strong> (attacker has the model's code) and <strong>Black Box</strong> (attacker knows nothing).
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          In a Black Box attack, hackers can train their <em>own</em> substitute model to mimic yours, generate attacks against their substitute, 
+          and then use those same attacks on your model. Surprisingly, these attacks are often "transferable." 
+          An adversarial image that fools a Google model will often fool a Facebook model, because they both learn similar features about the world.
         </p>
 
         <h3 className="text-xl font-bold text-white mt-6 mb-3">How We Fix It</h3>
@@ -455,8 +519,15 @@ const AutonomousBlog = () => {
           during the training phase and teaching the model to ignore them.
           <br/><br/>
           <strong>2. Sensor Redundancy:</strong> This is the big one. If the camera thinks the Stop sign is a Speed Limit sign, 
-          but the HD Map says "There is definitely a junction here," and the Radar sees cross-traffic, the car should be 
+          but the HD Map says "There is definitely a junction here," and the Lidar sees a wall, the car should be 
           smart enough to prioritize safety over the camera's confusion.
+          <br/><br/>
+          <strong>3. Input Sanitization:</strong> Before the image even reaches the neural network, we can "wash" it. 
+          Techniques like JPEG compression or slight blurring can destroy the delicate high-frequency noise of an attack 
+          without hurting the overall image too much.
+          <br/><br/>
+          <strong>4. The Infinite Arms Race:</strong> The reality is that defense is harder than offense. 
+          Every time researchers invent a new defense, attackers find a way to bypass it. Security in AI isn't a destination; it’s a constant game of cat and mouse.
         </p>
       </div>
     )

@@ -539,46 +539,150 @@ const AutonomousBlog = () => {
     preview: "Why represent a 3D world with a neural network when you can just throw millions of glowing 3D blobs at the screen?",
     content: (
       <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 text-lg leading-relaxed mb-4">
-          For a few years, <strong>NeRFs (Neural Radiance Fields)</strong> were the cool kids on the block. They used neural 
-          networks to "imagine" what an object looked like from any angle. The results were photorealistic, 
-          but rendering them was painfully slow. You essentially had to ask the neural network "what color is this pixel?" 
-          millions of times per frame.
+        <p className="text-gray-300 text-lg leading-relaxed mb-8">
+          For a few years, <strong>NeRFs (Neural Radiance Fields)</strong> were the undisputed kings of 3D reconstruction. 
+          They used neural networks to "imagine" what an object looked like from any angle. The results were photorealistic, 
+          but rendering them was painfully slow.
+        </p>
+        <p className="text-gray-300 text-lg leading-relaxed mb-12">
+          Enter <strong>3D Gaussian Splatting (3DGS)</strong>. It dropped in 2023, and it essentially said: "Forget the neural network. 
+          Let's just use millions of 3D ellipsoids." But before we choose a winner, we need to understand the battlefield.
+        </p>
+    
+        {/* ================================================================================== */}
+        {/* PART 1: THE BASICS - HOW 3D WORKS */}
+        {/* ================================================================================== */}
+        
+        <div className="border-l-4 border-blue-500 pl-6 my-10 bg-gray-900/50 py-4 rounded-r-lg">
+          <h2 className="text-2xl font-bold text-white mb-4">Part 1: The Basics (Computer Vision 101)</h2>
+          <p className="text-gray-300 mb-4">
+              Before we talk about AI, we have to solve a physics problem: <strong>How do we get 3D depth from flat 2D images?</strong>
+          </p>
+        </div>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">1. The Pinhole Camera Model</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Every photo you take is a squashed version of reality. A 3D world (X, Y, Z) is projected onto a 2D plane (u, v pixels).
+          To reverse this, we need to know two things about the camera that took the photo:
+        </p>
+        <ul className="list-disc list-inside text-gray-300 mb-6 ml-4 space-y-2">
+          <li><strong>Extrinsics (Where was the camera?):</strong> The Position (X,Y,Z) and Rotation of the camera in the world.</li>
+          <li><strong>Intrinsics (How does the lens work?):</strong> The Focal Length and Principal Point. This tells us how "zoomed in" the image is.</li>
+        </ul>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">2. Structure from Motion (SfM) & COLMAP</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is Step Zero for both NeRFs and Gaussian Splats. We feed 50-100 images into a tool called <strong>COLMAP</strong>.
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          Enter <strong>3D Gaussian Splatting</strong>. It dropped in 2023, and it essentially said: "Forget the neural network. 
-          Let's just use millions of 3D ellipsoids."
+          COLMAP uses algorithms like SIFT (Scale-Invariant Feature Transform) to find "key points"—distinctive corners, edges, or textures 
+          that appear in multiple photos. If it sees the same "corner of a table" in Image A and Image B, it can draw a line from both cameras. 
+          <strong>Where those lines intersect in 3D space is the point's location.</strong>
         </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">What is a Splat?</h3>
+        
+        <p className="text-gray-300 leading-relaxed mb-8">
+          This process creates a <strong>"Sparse Point Cloud"</strong>—a ghostly cloud of floating dots that roughly outlines the scene. 
+          This is our starting point.
+        </p>
+    
+        {/* ================================================================================== */}
+        {/* PART 2: THE NERF ERA */}
+        {/* ================================================================================== */}
+    
+        <div className="border-l-4 border-purple-500 pl-6 my-10 bg-gray-900/50 py-4 rounded-r-lg">
+          <h2 className="text-2xl font-bold text-white mb-4">Part 2: The NeRF Era (Implicit Representation)</h2>
+        </div>
+    
         <p className="text-gray-300 leading-relaxed mb-4">
-          Imagine taking a point cloud (dots in space) and smearing each dot out into a fuzzy 3D oval (a Gaussian). 
-          Each oval has a position, rotation, scale, color, and opacity.
+          NeRFs look at that Sparse Point Cloud and say, "That's not enough detail." But instead of storing more points, NeRFs store the scene 
+          inside a function.
+        </p>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">The "Black Box" Approach</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          A NeRF is a <strong>Multi-Layer Perceptron (MLP)</strong>—a tiny neural network. You give it a coordinate (X, Y, Z) and a viewing direction, 
+          and it outputs a Color (RGB) and a Density (Sigma).
+          <br/>
+          <em>Input: (x, y, z, theta, phi) → Network → Output: (R, G, B, Opacity)</em>
+        </p>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">Why is it so slow? (Ray Marching)</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          To render a <strong>single pixel</strong> on your screen, the NeRF engine has to shoot a ray through that pixel into the 3D void. 
+          Because it doesn't know where objects are, it has to "march" along that ray, stopping every few millimeters to ask the neural network: 
+          "Is there anything here?"
+        </p>
+        <p className="text-gray-300 leading-relaxed mb-8">
+          It does this hundreds of times <em>per ray</em>. For a 1080p image (2 million pixels), that is billions of network queries per frame. 
+          That is why NeRFs run at 0.5 FPS.
+        </p>
+    
+        {/* ================================================================================== */}
+        {/* PART 3: THE SPLATTING REVOLUTION */}
+        {/* ================================================================================== */}
+    
+        <div className="border-l-4 border-green-500 pl-6 my-10 bg-gray-900/50 py-4 rounded-r-lg">
+          <h2 className="text-2xl font-bold text-white mb-4">Part 3: Gaussian Splatting (Explicit Representation)</h2>
+        </div>
+    
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Gaussian Splatting is a return to "Explicit" geometry. It doesn't use a neural network to render. It uses a list of blobs.
+        </p>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">The Anatomy of a Splat</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          Instead of triangles (like in video games), we use <strong>3D Gaussians</strong> (ellipsoids). 
+          The system initializes one Gaussian at every point in the COLMAP sparse cloud. Each Gaussian carries these parameters:
+        </p>
+        <ul className="list-disc list-inside text-gray-300 mb-6 ml-4 space-y-2">
+          <li><strong>Position (Mean):</strong> XYZ center.</li>
+          <li><strong>Covariance Matrix:</strong> A 3x3 matrix that defines the shape. Is it a long thin cigar? A flat pancake? A perfect sphere?</li>
+          <li><strong>Alpha:</strong> How transparent it is.</li>
+          <li><strong>Spherical Harmonics (SH):</strong> This is the magic. It stores 16+ numbers that define how the color changes depending on the viewing angle (simulating gloss/reflections).</li>
+        </ul>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">How It Learns: Adaptive Density Control</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          This is the most brilliant part of the algorithm. We start with a sparse, hole-filled cloud. We need to fill it in.
+          We perform <strong>Gradient Descent</strong> comparing the rendered image to the real photo.
+        </p>
+        <div className="bg-gray-800 p-6 rounded-lg mb-6">
+          <h4 className="font-bold text-blue-400 mb-2">The "Clone vs. Split" Logic:</h4>
+          <ul className="list-disc list-inside text-gray-300 space-y-2">
+            <li><strong>Under-Reconstruction:</strong> If an area is too blurry but the Gaussian is small, the system <strong>CLONES</strong> it (makes a copy) and moves it slightly to fill the gap.</li>
+            <li><strong>Over-Reconstruction:</strong> If a Gaussian is huge and trying to cover too much detail (high variance), the system <strong>SPLITS</strong> it into two smaller Gaussians to capture finer detail.</li>
+            <li><strong>Pruning:</strong> If a Gaussian becomes virtually invisible (Alpha &lt; 0.005), it is deleted to save memory.</li>
+          </ul>
+        </div>
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">The Speed Secret: Tile-Based Rasterization</h3>
+        <p className="text-gray-300 leading-relaxed mb-4">
+          NeRFs are slow because of Ray Marching. Gaussian Splatting is fast because of <strong>Rasterization</strong>.
         </p>
         <p className="text-gray-300 leading-relaxed mb-4">
-          
-          When you look at millions of these overlapping ovals from a distance, they blend together perfectly to create a 
-          sharp, continuous image. It's like pointillism painting, but in 3D and on steroids. The math relies on 
-          "alpha blending," which GPUs have been optimized to do for decades.
+          1. <strong>Projection:</strong> The 3D ellipsoids are mathematically projected onto the 2D camera plane.
+          <br/>
+          2. <strong>Sorting:</strong> The system uses a super-fast GPU Radix Sort to order the splats from front-to-back.
+          <br/>
+          3. <strong>Tiling:</strong> The screen is divided into 16x16 pixel tiles. Each tile only processes the splats that touch it.
+          <br/>
+          4. <strong>Alpha Blending:</strong> The colors are accumulated until the opacity reaches 100%.
         </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Why AVs Love Splats</h3>
+        <p className="text-gray-300 leading-relaxed mb-8">
+          This pipeline avoids querying a neural network entirely. It’s pure matrix math, which GPUs eat for breakfast. 
+          This is how we get <strong>100+ FPS</strong>.
+        </p>
+    
+        {/* ================================================================================== */}
+        {/* CONCLUSION */}
+        {/* ================================================================================== */}
+    
+        <h3 className="text-xl font-bold text-white mt-8 mb-4">The Verdict</h3>
         <p className="text-gray-300 leading-relaxed mb-4">
-          For autonomous vehicles, we need to reconstruct static environments (buildings, trees, roads) to verify our maps 
-          or train simulations. NeRFs took minutes to render a scene. Gaussian Splats can render at 
-          <strong> 100+ frames per second</strong> in real-time.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This means we can drive a car through a city, capture video, and have a fully navigable, photorealistic 3D digital twin 
-          of that city ready almost instantly. It allows for "Neural Simulators" where we can re-simulate traffic scenarios 
-          in a world that looks indistinguishable from reality.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Trade-off</h3>
-        <p className="text-gray-300 leading-relaxed">
-          The catch? File size. A NeRF is just a small set of weights (a few MB). A high-quality Gaussian Splat scene 
-          can be gigabytes of data because you are storing millions of explicit parameters. But for the visual fidelity 
-          and speed we get? It's a trade we are willing to take.
+          <strong>NeRFs</strong> are perfect if you have tiny storage limits (MBs) and don't care about render time.
+          <br/>
+          <strong>Gaussian Splats</strong> are the future for real-time applications (VR, AR, Autonomous Driving sims). 
+          The files are larger (GBs), but the ability to render photorealism at 120 FPS is a game-changer we haven't seen in decades.
         </p>
       </div>
     )

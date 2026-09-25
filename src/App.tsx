@@ -1,41 +1,93 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, BookOpen, User, Home, Navigation2, MapPin, Layers, Compass } from 'lucide-react';
 import * as THREE from 'three';
-import mcAfeeImage from '../src/assets/McAfeeThirthyFive.png'
-import thysRanst from '../src/assets/ThysRanst.png'
+import mcAfeeImage from '../src/assets/McAfeeThirthyFive.png';
+import thysRanst from '../src/assets/ThysRanst.png';
 
 // --- Configuration Constants ---
-// Define a loop of road nodes: 8 points forming a square/octagon loop
-const ROAD_NODES = [
-  { x: -60, z: -60 }, // 0: Top-Left
-  { x: 0,   z: -60 }, // 1: Top-Mid
-  { x: 60,  z: -60 }, // 2: Top-Right
-  { x: 60,  z: 0   }, // 3: Right-Mid
-  { x: 60,  z: 60  }, // 4: Bottom-Right
-  { x: 0,   z: 60  }, // 5: Bottom-Mid
-  { x: -60, z: 60  }, // 6: Bottom-Left
-  { x: -60, z: 0   }, // 7: Left-Mid
+export interface Waypoint {
+  name?: string;
+  x: number;
+  z: number;
+  heading?: number;
+}
+
+const cornerArcRadius = 8;
+const cornerOffset = 52;
+
+const getCircuitArcPoints = (cx: number, cz: number, a1: number, a2: number): Waypoint[] => {
+  const pts: Waypoint[] = [];
+  const steps = 4;
+  for (let s = 1; s < steps; s++) {
+    const a = a1 + (s / steps) * (a2 - a1);
+    pts.push({
+      name: `arc_${cx}_${cz}_${s}`,
+      x: cx + cornerArcRadius * Math.cos(a),
+      z: cz + cornerArcRadius * Math.sin(a),
+    });
+  }
+  return pts;
+};
+
+// 24 waypoints along the closed circuit
+const CIRCUIT_WAYPOINTS: Waypoint[] = [
+  { name: 'home', x: 0, z: -60, heading: Math.PI / 2 },
+  { name: 'top_right_start', x: 52, z: -60 },
+  ...getCircuitArcPoints(cornerOffset, -cornerOffset, 3 * Math.PI / 2, 2 * Math.PI),
+  { name: 'top_right_end', x: 60, z: -52 },
+  { name: 'publications', x: 60, z: 0, heading: 0 },
+  { name: 'bot_right_start', x: 60, z: 52 },
+  ...getCircuitArcPoints(cornerOffset, cornerOffset, 0, Math.PI / 2),
+  { name: 'bot_right_end', x: 52, z: 60 },
+  { name: 'blog', x: 0, z: 60, heading: -Math.PI / 2 },
+  { name: 'bot_left_start', x: -52, z: 60 },
+  ...getCircuitArcPoints(-cornerOffset, cornerOffset, Math.PI / 2, Math.PI),
+  { name: 'bot_left_end', x: -60, z: 52 },
+  { name: 'about', x: -60, z: 0, heading: Math.PI },
+  { name: 'top_left_start', x: -60, z: -52 },
+  ...getCircuitArcPoints(-cornerOffset, -cornerOffset, Math.PI, 3 * Math.PI / 2),
+  { name: 'top_left_end', x: -52, z: -60 },
 ];
 
+const computeRoute = (fromId: string, toId: string): Waypoint[] => {
+  const startIdx = CIRCUIT_WAYPOINTS.findIndex(p => p.name === fromId);
+  const endIdx = CIRCUIT_WAYPOINTS.findIndex(p => p.name === toId);
+  if (startIdx === -1 || endIdx === -1) return [];
+
+  const N = CIRCUIT_WAYPOINTS.length;
+  let cwDist = (endIdx - startIdx + N) % N;
+  let ccwDist = (startIdx - endIdx + N) % N;
+
+  const path: Waypoint[] = [];
+  if (cwDist <= ccwDist) {
+    for (let i = 0; i <= cwDist; i++) {
+      path.push(CIRCUIT_WAYPOINTS[(startIdx + i) % N]);
+    }
+  } else {
+    for (let i = 0; i <= ccwDist; i++) {
+      path.push(CIRCUIT_WAYPOINTS[(startIdx - i + N) % N]);
+    }
+  }
+  return path;
+};
+
+// 4 Straight Roads forming the sides of the circuit
 const ROADS = [
-  { from: ROAD_NODES[0], to: ROAD_NODES[1] },
-  { from: ROAD_NODES[1], to: ROAD_NODES[2] },
-  { from: ROAD_NODES[2], to: ROAD_NODES[3] },
-  { from: ROAD_NODES[3], to: ROAD_NODES[4] },
-  { from: ROAD_NODES[4], to: ROAD_NODES[5] },
-  { from: ROAD_NODES[5], to: ROAD_NODES[6] },
-  { from: ROAD_NODES[6], to: ROAD_NODES[7] },
-  { from: ROAD_NODES[7], to: ROAD_NODES[0] },
+  { from: { x: -52, z: -60 }, to: { x: 52, z: -60 } }, // North
+  { from: { x: 60, z: -52 }, to: { x: 60, z: 52 } },   // East
+  { from: { x: 52, z: 60 }, to: { x: -52, z: 60 } },   // South
+  { from: { x: -60, z: 52 }, to: { x: -60, z: -52 } }, // West
 ];
 
+// 4 Destinations along the 4 sides of the loop
 const DESTINATIONS = [
   { 
     id: 'home', 
     name: 'Home Base', 
     icon: Home, 
     coords: { lat: 12.9698, lng: 77.7500 },
-    position3D: { x: -80, z: -60 }, // Outside Top-Left
-    entryNodeIdx: 0, // Connects to Node 0
+    position3D: { x: 0, z: -74 },
+    stopPosition: { x: 0, z: -60 },
     color: '#3b82f6',
     buildingColor: 0x3b82f6,
     height: 8
@@ -45,8 +97,8 @@ const DESTINATIONS = [
     name: 'Publications Hub', 
     icon: FileText, 
     coords: { lat: 12.9850, lng: 77.7300 },
-    position3D: { x: 80, z: -60 }, // Outside Top-Right
-    entryNodeIdx: 2, // Connects to Node 2
+    position3D: { x: 74, z: 0 },
+    stopPosition: { x: 60, z: 0 },
     color: '#10b981',
     buildingColor: 0x10b981,
     height: 15
@@ -56,8 +108,8 @@ const DESTINATIONS = [
     name: 'Blog Tower', 
     icon: BookOpen, 
     coords: { lat: 12.9520, lng: 77.7650 },
-    position3D: { x: 80, z: 60 }, // Outside Bottom-Right
-    entryNodeIdx: 4, // Connects to Node 4
+    position3D: { x: 0, z: 74 },
+    stopPosition: { x: 0, z: 60 },
     color: '#f59e0b',
     buildingColor: 0xf59e0b,
     height: 12
@@ -67,8 +119,8 @@ const DESTINATIONS = [
     name: 'About Plaza', 
     icon: User, 
     coords: { lat: 12.9600, lng: 77.7400 },
-    position3D: { x: -80, z: 60 }, // Outside Bottom-Left
-    entryNodeIdx: 6, // Connects to Node 6
+    position3D: { x: -74, z: 0 },
+    stopPosition: { x: -60, z: 0 },
     color: '#8b5cf6',
     buildingColor: 0x8b5cf6,
     height: 10,
@@ -77,58 +129,53 @@ const DESTINATIONS = [
 ];
 
 // --- Vector Map Component ---
-const VectorMap = ({ currentPosition, destinations, roads, isNavigating, navigationProgress, currentRoute }) => {
-  const viewBoxSize = 200; // Increased view box
+const VectorMap = ({ currentPosition, destinations, isNavigating, navigationProgress, currentRoute }: any) => {
+  const viewBoxSize = 200;
   const offset = viewBoxSize / 2;
 
   // Calculate dynamic car position for the 2D map
   const getCarPosition = () => {
     if (!isNavigating || !currentRoute.path || currentRoute.path.length === 0) {
-        // If parked, show at the parking spot (z + 8 relative to building)
-        return { 
-            x: currentPosition.position3D.x, 
-            z: currentPosition.position3D.z + 8 
-        };
+      return currentPosition.stopPosition || { x: 0, z: -60 };
     }
     
-    // Map the current route segment to the 2D view
     const totalSegments = currentRoute.path.length - 1;
+    if (totalSegments <= 0) return currentPosition.stopPosition || { x: 0, z: -60 };
+
     const progressPerSegment = 1 / totalSegments;
     const currentSegmentIndex = Math.min(
-        Math.floor(navigationProgress / progressPerSegment),
-        totalSegments - 1
+      Math.floor(navigationProgress / progressPerSegment),
+      totalSegments - 1
     );
     const segmentProgress = (navigationProgress - (currentSegmentIndex * progressPerSegment)) / progressPerSegment;
 
     const p1 = currentRoute.path[currentSegmentIndex];
     const p2 = currentRoute.path[currentSegmentIndex + 1];
 
-    if (!p1 || !p2) return currentPosition.position3D;
+    if (!p1 || !p2) return currentPosition.stopPosition || { x: 0, z: -60 };
 
     return {
-        x: p1.x + (p2.x - p1.x) * segmentProgress,
-        z: p1.z + (p2.z - p1.z) * segmentProgress
+      x: p1.x + (p2.x - p1.x) * segmentProgress,
+      z: p1.z + (p2.z - p1.z) * segmentProgress
     };
   };
 
   const carPos = getCarPosition();
 
-  // Simple rotation logic for the puck
   let rotation = 0;
-  if (isNavigating && currentRoute.path.length > 0) {
-      // Find current segment
-      const totalSegments = currentRoute.path.length - 1;
-      const progressPerSegment = 1 / totalSegments;
-      const idx = Math.min(Math.floor(navigationProgress / progressPerSegment), totalSegments - 1);
-      const p1 = currentRoute.path[idx];
-      const p2 = currentRoute.path[idx+1];
-      if(p1 && p2) {
-          rotation = Math.atan2(p2.x - p1.x, p2.z - p1.z) * (180 / Math.PI);
-      }
+  if (isNavigating && currentRoute.path.length > 1) {
+    const totalSegments = currentRoute.path.length - 1;
+    const progressPerSegment = 1 / totalSegments;
+    const idx = Math.min(Math.floor(navigationProgress / progressPerSegment), totalSegments - 1);
+    const p1 = currentRoute.path[idx];
+    const p2 = currentRoute.path[idx + 1];
+    if (p1 && p2) {
+      rotation = Math.atan2(p2.x - p1.x, -(p2.z - p1.z)) * (180 / Math.PI);
+    }
   }
 
   return (
-    <div className="w-full h-full bg-[#0f1419] relative overflow-hidden select-none border-t border-slate-800">
+    <div className="w-full h-full bg-[#0f1419] relative overflow-hidden select-none">
       {/* Grid Background */}
       <svg className="absolute inset-0 w-full h-full opacity-20" width="100%" height="100%">
         <defs>
@@ -143,76 +190,77 @@ const VectorMap = ({ currentPosition, destinations, roads, isNavigating, navigat
       <svg 
         viewBox={`-${offset} -${offset} ${viewBoxSize} ${viewBoxSize}`} 
         className="w-full h-full"
-        style={{ padding: '20px' }}
+        style={{ padding: '16px' }}
       >
-        {/* Roads */}
-        {roads.map((road, i) => (
-          <g key={i}>
-            <line x1={road.from.x} y1={road.from.z} x2={road.to.x} y2={road.to.z}
-              stroke="#2d3748" strokeWidth="6" strokeLinecap="round" />
-            <line x1={road.from.x} y1={road.from.z} x2={road.to.x} y2={road.to.z}
-              stroke="#4a5568" strokeWidth="2" strokeLinecap="round" />
-          </g>
-        ))}
+        {/* Roads: Continuous Circuit with Curved Corners */}
+        <rect 
+          x="-60" y="-60" width="120" height="120" rx="8" ry="8"
+          fill="none" stroke="#2d3748" strokeWidth="8" strokeLinejoin="round" 
+        />
+        <rect 
+          x="-60" y="-60" width="120" height="120" rx="8" ry="8"
+          fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3 3" strokeLinejoin="round" 
+        />
 
         {/* Destination Zones */}
-        {destinations.map(dest => (
+        {destinations.map((dest: any) => (
           <g key={dest.id} transform={`translate(${dest.position3D.x}, ${dest.position3D.z})`}>
-            {/* Connection to parking */}
-            <line x1="0" y1="0" x2="0" y2="8" stroke="#333" strokeWidth="2" />
+            {/* Connection dashed line */}
+            <line 
+              x1="0" y1="0" 
+              x2={dest.stopPosition.x - dest.position3D.x} 
+              y2={dest.stopPosition.z - dest.position3D.z} 
+              stroke="#475569" strokeWidth="2" strokeDasharray="2 2" 
+            />
             
             {/* Building Marker */}
-            <rect x="-4" y="-4" width="8" height="8" fill={dest.color} rx="2" stroke="#1a1a1a" strokeWidth="1"/>
+            <rect x="-6" y="-6" width="12" height="12" fill={dest.color} rx="2" stroke="#0a0a15" strokeWidth="1.5"/>
             
             {/* Label */}
-            <text y="-7" textAnchor="middle" fill="#94a3b8" fontSize="4" fontWeight="600" style={{ textShadow: '0px 1px 2px black' }}>
+            <text 
+              y={dest.position3D.z < -40 ? -10 : 13} 
+              textAnchor="middle" fill="#94a3b8" fontSize="5" fontWeight="600" 
+              style={{ textShadow: '0px 1px 2px black' }}
+            >
               {dest.name}
             </text>
           </g>
         ))}
 
-        {/* The Car / User Position */}
+        {/* Car Puck */}
         <g transform={`translate(${carPos.x}, ${carPos.z}) rotate(${rotation})`}>
-          <path d="M 0 0 L -6 20 L 6 20 Z" fill="url(#gradient)" opacity="0.4" />
-          <defs>
-             <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-               <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
-               <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-             </linearGradient>
-          </defs>
           <circle r="4" fill="#3b82f6" stroke="white" strokeWidth="1.5" />
+          <path d="M 0 -7 L 3 -3 L -3 -3 Z" fill="#60a5fa" />
         </g>
       </svg>
       
-      <div className="absolute top-7 right-7">
-      <div className="bg-slate-900/80 p-1.5 rounded-full border border-slate-700 shadow-md text-white">
-        <Compass size={14} className="text-blue-400" />
+      <div className="absolute top-3 right-3">
+        <div className="bg-slate-900/80 p-1 rounded-full border border-slate-700 shadow-md text-white">
+          <Compass size={13} className="text-blue-400" />
+        </div>
       </div>
-    </div>
-
     </div>
   );
 };
 
-
 const AutonomousBlog = () => {
-  const [selectedDestination, setSelectedDestination] = useState(DESTINATIONS[0]);
-  const [selectedBlogPost, setSelectedBlogPost] = useState(null);
+  const [selectedDestination, setSelectedDestination] = useState<any>(DESTINATIONS[0]);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<any>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
   const [currentRoute, setCurrentRoute] = useState<{
-    path: { x: number; z: number }[];
+    path: Waypoint[];
     destination: any | null;
   }>({
     path: [],
     destination: null
   });
 
-  const canvasRef = useRef(null);
-  const sceneRef = useRef(null);
-  const carRef = useRef(null);
-  const cameraRef = useRef(null);
-  const buildingsRef = useRef([]);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const carRef = useRef<THREE.Group | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const buildingsRef = useRef<THREE.Group[]>([]);
 
   const [currentPosition, setCurrentPosition] = useState(DESTINATIONS[0]);
 
@@ -744,30 +792,58 @@ const AutonomousBlog = () => {
     if (!canvasRef.current) return;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x1a1a2e, 80, 300); // Increased fog distance
+    // Soft distant fog: doesn't wash out foreground buildings
+    scene.fog = new THREE.Fog(0x0a0a15, 120, 450);
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 500);
-    camera.position.set(0, 40, 60); // Higher and further back
-    camera.lookAt(0, 0, 0);
+    const container = canvasRef.current.parentElement;
+    const initialWidth = container ? container.clientWidth : 800;
+    const initialHeight = container ? container.clientHeight : 800;
+
+    // FOV 50 gives a cinematic, comfortable perspective with generous vertical headroom
+    const camera = new THREE.PerspectiveCamera(50, initialWidth / initialHeight, 0.1, 800);
+    // Courtyard elevated vantage point looking at Home Base
+    camera.position.set(0, 48, -21);
+    camera.lookAt(0, 2, -60);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ 
       canvas: canvasRef.current, 
       antialias: true,
-      alpha: true 
+      alpha: false,
+      powerPreference: "high-performance"
     });
-    renderer.setSize(800, 800);
+    renderer.setSize(initialWidth, initialHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setClearColor(0x0a0a15, 1);
 
-    const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+    // Responsive Resize Observer
+    const handleResize = () => {
+      if (!container || !cameraRef.current) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      cameraRef.current.aspect = w / h;
+      cameraRef.current.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (container) {
+      resizeObserver.observe(container);
+    }
+
+    const ambientLight = new THREE.AmbientLight(0x505070, 0.6);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(50, 80, 50);
-    directionalLight.castShadow = false;
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x1a2035, 0.7);
+    hemiLight.position.set(0, 100, 0);
+    scene.add(hemiLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    directionalLight.position.set(50, 90, 50);
+    directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
@@ -779,7 +855,7 @@ const AutonomousBlog = () => {
     scene.add(directionalLight);
 
     // Ground
-    const groundGeometry = new THREE.PlaneGeometry(500, 500);
+    const groundGeometry = new THREE.PlaneGeometry(600, 600);
     const groundMaterial = new THREE.MeshStandardMaterial({ 
       color: 0x0f1419,
       roughness: 0.95,
@@ -790,30 +866,47 @@ const AutonomousBlog = () => {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const gridHelper = new THREE.GridHelper(500, 100, 0x1a4d6f, 0x0d2433);
+    const gridHelper = new THREE.GridHelper(600, 120, 0x1a4d6f, 0x0d2433);
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // Roads
+    // --- Roads Setup with Curved Corner Meshes ---
     const roadWidth = 8;
+    const cornerRadius = 8;
+    const halfWidth = roadWidth / 2; // 4
+    const innerRadius = cornerRadius - halfWidth; // 4
+    const outerRadius = cornerRadius + halfWidth; // 12
+    const cornerCenterOffset = 52;
+
     const textureLoader = new THREE.TextureLoader();
-    const roadTexture = textureLoader.load('/assets/bigger_road.png');
+    const roadTexture = textureLoader.load('/assets/road_straight.png');
     roadTexture.wrapS = THREE.RepeatWrapping;
     roadTexture.wrapT = THREE.RepeatWrapping;
     
     const roadMaterial = new THREE.MeshStandardMaterial({ 
       map: roadTexture,
-      transparent: true,
-      roughness: 1.0
+      roughness: 0.9,
+      side: THREE.DoubleSide
     });
 
-    ROADS.forEach(road => {
+    // 4 Straight road segments
+    const straightRoads = [
+      // North side (z = -60)
+      { from: { x: -cornerCenterOffset, z: -60 }, to: { x: cornerCenterOffset, z: -60 } },
+      // East side (x = 60)
+      { from: { x: 60, z: -cornerCenterOffset }, to: { x: 60, z: cornerCenterOffset } },
+      // South side (z = 60)
+      { from: { x: cornerCenterOffset, z: 60 }, to: { x: -cornerCenterOffset, z: 60 } },
+      // West side (x = -60)
+      { from: { x: -60, z: cornerCenterOffset }, to: { x: -60, z: -cornerCenterOffset } },
+    ];
+
+    straightRoads.forEach(road => {
       const dx = road.to.x - road.from.x;
       const dz = road.to.z - road.from.z;
       const length = Math.sqrt(dx * dx + dz * dz);
       const angle = Math.atan2(dx, dz);
 
-      // Calculate texture repeat for consistent road appearance
       const repeatY = length / roadWidth;
       const geometry = new THREE.PlaneGeometry(roadWidth, length);
       const material = roadMaterial.clone();
@@ -824,110 +917,208 @@ const AutonomousBlog = () => {
       const roadMesh = new THREE.Mesh(geometry, material);
       roadMesh.rotation.x = -Math.PI / 2;
       roadMesh.rotation.z = -angle;
-      roadMesh.position.set((road.from.x + road.to.x)/2, 0.02, (road.from.z + road.to.z)/2);
+      roadMesh.position.set((road.from.x + road.to.x) / 2, 0.02, (road.from.z + road.to.z) / 2);
       roadMesh.receiveShadow = true;
       scene.add(roadMesh);
     });
 
-    // Buildings
+    // 4 Corner Curve Meshes
+    const cornerConfigs = [
+      // Bottom-Right Corner (Connecting x=60, z=52 to x=52, z=60)
+      { cx: cornerCenterOffset, cz: cornerCenterOffset, startAngle: 0, endAngle: Math.PI / 2 },
+      // Bottom-Left Corner (Connecting x=-52, z=60 to x=-60, z=52)
+      { cx: -cornerCenterOffset, cz: cornerCenterOffset, startAngle: Math.PI / 2, endAngle: Math.PI },
+      // Top-Left Corner (Connecting x=-60, z=-52 to x=-52, z=-60)
+      { cx: -cornerCenterOffset, cz: -cornerCenterOffset, startAngle: Math.PI, endAngle: 3 * Math.PI / 2 },
+      // Top-Right Corner (Connecting x=52, z=-60 to x=60, z=-52)
+      { cx: cornerCenterOffset, cz: -cornerCenterOffset, startAngle: 3 * Math.PI / 2, endAngle: 2 * Math.PI },
+    ];
+
+    cornerConfigs.forEach(cfg => {
+      const segments = 32;
+      const geometry = new THREE.BufferGeometry();
+      const vertices: number[] = [];
+      const uvs: number[] = [];
+      const indices: number[] = [];
+
+      const arcLen = cornerRadius * Math.abs(cfg.endAngle - cfg.startAngle);
+      const repeatV = arcLen / roadWidth;
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const angle = cfg.startAngle + t * (cfg.endAngle - cfg.startAngle);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        vertices.push(cfg.cx + innerRadius * cos, 0.02, cfg.cz + innerRadius * sin);
+        vertices.push(cfg.cx + outerRadius * cos, 0.02, cfg.cz + outerRadius * sin);
+
+        uvs.push(0, t * repeatV);
+        uvs.push(1, t * repeatV);
+      }
+
+      for (let i = 0; i < segments; i++) {
+        const i1 = i * 2;
+        const i2 = i * 2 + 1;
+        const i3 = (i + 1) * 2;
+        const i4 = (i + 1) * 2 + 1;
+
+        indices.push(i1, i2, i3);
+        indices.push(i2, i4, i3);
+      }
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      const cornerMat = roadMaterial.clone();
+      cornerMat.map = roadTexture.clone();
+      cornerMat.map.wrapS = THREE.RepeatWrapping;
+      cornerMat.map.wrapT = THREE.RepeatWrapping;
+      cornerMat.map.repeat.set(1, 1);
+      cornerMat.map.needsUpdate = true;
+
+      const cornerMesh = new THREE.Mesh(geometry, cornerMat);
+      cornerMesh.receiveShadow = true;
+      scene.add(cornerMesh);
+    });
+
+    // 4 Roadside Destinations (Buildings, Sidewalks, Windows, Stop Markings)
     DESTINATIONS.forEach(dest => {
       const group = new THREE.Group();
       
-      // Main Building
-      const bGeo = new THREE.BoxGeometry(10, dest.height, 10);
-      const bMat = new THREE.MeshStandardMaterial({ color: dest.buildingColor, roughness: 0.7 });
+      // Building Box
+      const bGeo = new THREE.BoxGeometry(12, dest.height, 12);
+      const bMat = new THREE.MeshStandardMaterial({ 
+        color: dest.buildingColor, 
+        roughness: 0.6,
+        metalness: 0.2
+      });
       const building = new THREE.Mesh(bGeo, bMat);
-      building.position.y = dest.height / 2;
+      building.position.set(dest.position3D.x, dest.height / 2, dest.position3D.z);
       building.castShadow = true;
+      building.receiveShadow = true;
       group.add(building);
 
-      // Simple Windows
-      for(let i=0; i<4; i++) {
-          const w = new THREE.Mesh(
-              new THREE.BoxGeometry(0.6, 0.6, 0.1),
-              new THREE.MeshStandardMaterial({color: 0x60a5fa, emissive: 0x60a5fa, emissiveIntensity: 0.5})
-          );
-          w.position.set(2, dest.height - 3 - (i*2), 5.05);
+      // Rooftop Accent
+      const roofGeo = new THREE.BoxGeometry(12.4, 0.4, 12.4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.set(dest.position3D.x, dest.height + 0.2, dest.position3D.z);
+      group.add(roof);
+
+      const isNorth = dest.id === 'home';
+      const isEast = dest.id === 'publications';
+      const isSouth = dest.id === 'blog';
+      const isWest = dest.id === 'about';
+
+      // Concrete Sidewalk in front of building entrance
+      const walkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+      let walkGeo;
+      let walkPos = { x: dest.position3D.x, y: 0.04, z: dest.position3D.z };
+
+      if (isNorth) {
+        walkGeo = new THREE.BoxGeometry(16, 0.08, 4);
+        walkPos = { x: 0, y: 0.04, z: -66 };
+      } else if (isSouth) {
+        walkGeo = new THREE.BoxGeometry(16, 0.08, 4);
+        walkPos = { x: 0, y: 0.04, z: 66 };
+      } else if (isEast) {
+        walkGeo = new THREE.BoxGeometry(4, 0.08, 16);
+        walkPos = { x: 66, y: 0.04, z: 0 };
+      } else { // West
+        walkGeo = new THREE.BoxGeometry(4, 0.08, 16);
+        walkPos = { x: -66, y: 0.04, z: 0 };
+      }
+      const sidewalk = new THREE.Mesh(walkGeo, walkMat);
+      sidewalk.position.set(walkPos.x, walkPos.y, walkPos.z);
+      sidewalk.receiveShadow = true;
+      group.add(sidewalk);
+
+      // Windows on front facade facing road
+      const winMat = new THREE.MeshStandardMaterial({ 
+        color: 0x60a5fa, 
+        emissive: 0x60a5fa, 
+        emissiveIntensity: 0.6 
+      });
+      for (let floor = 0; floor < Math.floor(dest.height / 3); floor++) {
+        for (let col = -1; col <= 1; col++) {
+          const w = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.2), winMat);
+          const y = 3 + floor * 2.8;
+          if (isNorth) {
+            w.position.set(dest.position3D.x + col * 3, y, dest.position3D.z + 6.1);
+          } else if (isSouth) {
+            w.position.set(dest.position3D.x + col * 3, y, dest.position3D.z - 6.1);
+          } else if (isEast) {
+            w.rotation.y = Math.PI / 2;
+            w.position.set(dest.position3D.x - 6.1, y, dest.position3D.z + col * 3);
+          } else { // West
+            w.rotation.y = Math.PI / 2;
+            w.position.set(dest.position3D.x + 6.1, y, dest.position3D.z + col * 3);
+          }
           group.add(w);
+        }
       }
 
-      // Parking Spot
-      const pGeo = new THREE.PlaneGeometry(5, 8);
-      const pMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a });
-      const parking = new THREE.Mesh(pGeo, pMat);
-      parking.rotation.x = -Math.PI / 2;
-      parking.position.set(0, 0.02, 10); // Parking is at Z+10 relative to building
-      group.add(parking);
-
-      // Connect parking to road visual (Driveway)
-      // We need to connect the parking spot (local 0,0,10) to the road node (global ROAD_NODES[dest.entryNodeIdx])
-      // Since the building is at dest.position3D, we can calculate the vector to the road node
-      
-      // For simplicity, we just add a small connector locally
-      const connGeo = new THREE.PlaneGeometry(4, 6);
-      const conn = new THREE.Mesh(connGeo, pMat);
-      conn.rotation.x = -Math.PI/2;
-      conn.position.set(0, 0.02, 14);
-      group.add(conn);
-
-      group.position.set(dest.position3D.x, 0, dest.position3D.z);
-      
-      // Rotate building to face the center or the road?
-      // Let's rotate them to face the center (0,0)
-      const angle = Math.atan2(dest.position3D.x, dest.position3D.z);
-      group.rotation.y = angle + Math.PI; // Face inward
+      // Parking / Stop Box painted on road
+      const stopLineMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const stopBoxGeo = new THREE.PlaneGeometry(7, 5);
+      const stopBox = new THREE.Mesh(stopBoxGeo, stopLineMat);
+      stopBox.rotation.x = -Math.PI / 2;
+      if (isEast || isWest) stopBox.rotation.z = Math.PI / 2;
+      stopBox.position.set(dest.stopPosition.x, 0.025, dest.stopPosition.z);
+      group.add(stopBox);
 
       scene.add(group);
       buildingsRef.current.push(group);
     });
 
-    // Car
+    // Vehicle
     const car = new THREE.Group();
     const body = new THREE.Mesh(
-        new THREE.BoxGeometry(1.8, 0.6, 4),
-        new THREE.MeshStandardMaterial({ color: 0x1a4d8f, metalness: 0.8 })
+      new THREE.BoxGeometry(2.2, 0.7, 4.4),
+      new THREE.MeshStandardMaterial({ color: 0x1a4d8f, metalness: 0.8, roughness: 0.3 })
     );
-    body.position.y = 0.5;
+    body.position.y = 0.55;
     body.castShadow = true;
     car.add(body);
 
     const cabin = new THREE.Mesh(
-        new THREE.BoxGeometry(1.6, 0.7, 2),
-        new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 })
+      new THREE.BoxGeometry(1.9, 0.8, 2.4),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.1 })
     );
-    cabin.position.y = 1.15;
-    cabin.position.z = -0.5;
+    cabin.position.y = 1.25;
+    cabin.position.z = -0.4;
+    cabin.castShadow = true;
     car.add(cabin);
 
-    // Initial Position (Parked at Home)
-    // Home is at dest[0].position3D. Parking is +10 local Z (rotated)
-    // We need to calculate the global position of the parking spot
-    const home = DESTINATIONS[0];
-    const homeAngle = Math.atan2(home.position3D.x, home.position3D.z) + Math.PI;
-    const parkingOffset = new THREE.Vector3(0, 0, 10);
-    parkingOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), homeAngle);
-    
-    car.position.set(
-        home.position3D.x + parkingOffset.x,
-        0.1,
-        home.position3D.z + parkingOffset.z
-    );
-    car.rotation.y = homeAngle;
+    // Headlights
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.1), lightMat);
+    hl1.position.set(0.7, 0.55, 2.21);
+    car.add(hl1);
+    const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.1), lightMat);
+    hl2.position.set(-0.7, 0.55, 2.21);
+    car.add(hl2);
+
+    // Initial Position (Parked at Home Base: x=0, z=-60, facing East along circuit)
+    car.position.set(0, 0.1, -60);
+    car.rotation.y = Math.PI / 2;
 
     carRef.current = car;
     scene.add(car);
 
     // Render Loop
     let frame = 0;
+    let animId: number;
     const animate = () => {
-      requestAnimationFrame(animate);
+      animId = requestAnimationFrame(animate);
       frame++;
       
       if (!isNavigating && carRef.current) {
-        // Subtle hover effect when parked
-        carRef.current.position.y = 0.1 + Math.sin(frame * 0.02) * 0.02;
+        carRef.current.position.y = 0.1 + Math.sin(frame * 0.03) * 0.03;
       } else if (carRef.current) {
-        // Stable on ground when driving
         carRef.current.position.y = 0.1;
       }
       
@@ -935,74 +1126,25 @@ const AutonomousBlog = () => {
     };
     animate();
 
-    return () => renderer.dispose();
+    return () => {
+      cancelAnimationFrame(animId);
+      resizeObserver.disconnect();
+      renderer.dispose();
+    };
   }, []);
 
-  // --- Improved Navigation Logic ---
-  const navigateTo = (destination) => {
+  // --- Navigation Logic ---
+  const navigateTo = (destination: any) => {
     if (isNavigating) return;
-    if (currentPosition.id == destination.id)
-    {
+    if (currentPosition.id === destination.id) {
       setSelectedDestination(destination);
       return;
     }
 
-    // Helper to get global parking position for a destination
-    const getParkingPos = (dest) => {
-        const angle = Math.atan2(dest.position3D.x, dest.position3D.z) + Math.PI;
-        const offset = new THREE.Vector3(0, 0, 10);
-        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-        return {
-            x: dest.position3D.x + offset.x,
-            z: dest.position3D.z + offset.z
-        };
-    };
+    const routePath = computeRoute(currentPosition.id, destination.id);
+    if (!routePath || routePath.length < 2) return;
 
-    const startParking = getParkingPos(currentPosition);
-    const endParking = getParkingPos(destination);
-
-    const startNodeIdx = currentPosition.entryNodeIdx;
-    const endNodeIdx = destination.entryNodeIdx;
-
-    // Calculate path along the loop
-    // We can go clockwise or counter-clockwise. Let's pick the shortest.
-    const numNodes = ROAD_NODES.length;
-    let cwDist = (endNodeIdx - startNodeIdx + numNodes) % numNodes;
-    let ccwDist = (startNodeIdx - endNodeIdx + numNodes) % numNodes;
-
-    let roadPath = [];
-    if (cwDist <= ccwDist) {
-        // Go Clockwise
-        for (let i = 0; i <= cwDist; i++) {
-            roadPath.push(ROAD_NODES[(startNodeIdx + i) % numNodes]);
-        }
-    } else {
-        // Go Counter-Clockwise
-        for (let i = 0; i <= ccwDist; i++) {
-            roadPath.push(ROAD_NODES[(startNodeIdx - i + numNodes) % numNodes]);
-        }
-    }
-
-    // Full Path: StartParking -> StartNode -> ... RoadNodes ... -> EndNode -> EndParking
-    const routePath = [
-        startParking,
-        ROAD_NODES[startNodeIdx],
-        ...roadPath.slice(1, -1), // Skip first (StartNode) and last (EndNode) to avoid dupes if we want, but actually we need them all
-        // Wait, roadPath includes startNode and endNode.
-        // So we just need to insert them.
-        // Actually, let's just use roadPath as is.
-        // But we need to connect parking to the node.
-    ];
-    
-    // Refined Path:
-    const finalPath = [
-        startParking,
-        ROAD_NODES[startNodeIdx],
-        ...roadPath.slice(1), // roadPath[0] is startNode, already added
-        endParking
-    ];
-
-    setCurrentRoute({ path: finalPath, destination });
+    setCurrentRoute({ path: routePath, destination });
     setIsNavigating(true);
     setCurrentPosition(destination);
   };
@@ -1011,72 +1153,95 @@ const AutonomousBlog = () => {
   useEffect(() => {
     if (!isNavigating || currentRoute.path.length === 0) return;
 
-    const SPEED = 0.4; // Units per frame approx
-    const ROTATION_SPEED = 0.1;
+    const SPEED = 0.55;
+    const ROTATION_SPEED = 0.14;
     let currentSegmentIndex = 0;
-    let animId;
+    let animId: number;
 
     const animateMovement = () => {
-        if (!carRef.current) return;
+      if (!carRef.current) return;
+      
+      const path = currentRoute.path;
+      if (currentSegmentIndex >= path.length - 1) {
+        // Reached destination
+        setIsNavigating(false);
+        setNavigationProgress(1);
+        setTimeout(() => setSelectedDestination(currentRoute.destination), 500);
+        return;
+      }
+
+      const isFinalSegment = currentSegmentIndex === path.length - 2;
+      const target = path[currentSegmentIndex + 1];
+      const current = carRef.current.position;
+
+      // 1. Calculate direction to target
+      const dx = target.x - current.x;
+      const dz = target.z - current.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      // 2. Determine target angle
+      const targetRotation = Math.atan2(dx, dz);
+      
+      // 3. Smoothly rotate car towards target
+      let rotDiff = targetRotation - carRef.current.rotation.y;
+      while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+      while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+      
+      carRef.current.rotation.y += rotDiff * ROTATION_SPEED;
+
+      // 4. Move car forward
+      if (Math.abs(rotDiff) < 0.8) {
+        const currentSpeed = isFinalSegment 
+          ? Math.max(0.12, Math.min(SPEED, dist * 0.22))
+          : SPEED;
+        const moveStep = Math.min(currentSpeed, dist);
+        carRef.current.position.x += (dx / dist) * moveStep;
+        carRef.current.position.z += (dz / dist) * moveStep;
+
+        const totalSegments = path.length - 1;
+        const segmentLen = Math.hypot(
+          path[currentSegmentIndex + 1].x - path[currentSegmentIndex].x,
+          path[currentSegmentIndex + 1].z - path[currentSegmentIndex].z
+        );
+        const segmentProgress = segmentLen > 0.01 ? 1 - (dist / segmentLen) : 1;
         
-        const path = currentRoute.path;
-        if (currentSegmentIndex >= path.length - 1) {
-            // Reached the end
-            setIsNavigating(false);
-            setTimeout(() => setSelectedDestination(currentRoute.destination), 500);
-            return;
+        setNavigationProgress(
+          Math.min(1, (currentSegmentIndex + segmentProgress) / totalSegments)
+        );
+
+        if (isFinalSegment && dist < 0.25) {
+          carRef.current.position.x = target.x;
+          carRef.current.position.z = target.z;
+          if (target.heading !== undefined) {
+            carRef.current.rotation.y = target.heading;
+          }
+          currentSegmentIndex++;
+          setIsNavigating(false);
+          setNavigationProgress(1);
+          setTimeout(() => setSelectedDestination(currentRoute.destination), 500);
+          return;
+        } else if (!isFinalSegment && dist < 0.8) {
+          currentSegmentIndex++;
         }
+      }
 
-        const target = path[currentSegmentIndex + 1];
-        const current = carRef.current.position;
-
-        // 1. Calculate direction to target
-        const dx = target.x - current.x;
-        const dz = target.z - current.z;
-        const dist = Math.sqrt(dx*dx + dz*dz);
-
-        // 2. Determine target angle
-        const targetRotation = Math.atan2(dx, dz);
-        
-        // 3. Smoothly rotate car towards target
-        let rotDiff = targetRotation - carRef.current.rotation.y;
-        // Normalize angle to -PI to PI
-        while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-        while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-        
-        carRef.current.rotation.y += rotDiff * ROTATION_SPEED;
-
-        // 4. Move car forward if aligned (or mostly aligned)
-        if (Math.abs(rotDiff) < 0.5) {
-            const moveStep = Math.min(SPEED, dist);
-            carRef.current.position.x += (dx / dist) * moveStep;
-            carRef.current.position.z += (dz / dist) * moveStep;
-
-            // Update global progress for the map
-            const totalSegments = path.length - 1;
-            const segmentProgress = 1 - (dist / Math.sqrt(
-                Math.pow(path[currentSegmentIndex+1].x - path[currentSegmentIndex].x, 2) +
-                Math.pow(path[currentSegmentIndex+1].z - path[currentSegmentIndex].z, 2)
-            ));
-            
-            setNavigationProgress(
-                (currentSegmentIndex + segmentProgress) / totalSegments
-            );
-
-            // Check if we reached the waypoint
-            if (dist < 0.5) {
-                currentSegmentIndex++;
-            }
+      // Camera Follow Logic (Inside-out elevated view from courtyard)
+      if (cameraRef.current && carRef.current) {
+        const carX = carRef.current.position.x;
+        const carZ = carRef.current.position.z;
+        if (!isNaN(carX) && !isNaN(carZ)) {
+          // Camera stays elevated inside the central courtyard
+          const targetCamX = carX * 0.35;
+          const targetCamZ = carZ * 0.35;
+          const targetCamY = 48;
+          cameraRef.current.position.x += (targetCamX - cameraRef.current.position.x) * 0.05;
+          cameraRef.current.position.y += (targetCamY - cameraRef.current.position.y) * 0.05;
+          cameraRef.current.position.z += (targetCamZ - cameraRef.current.position.z) * 0.05;
+          cameraRef.current.lookAt(carX, 2, carZ);
         }
+      }
 
-        // Camera Follow Logic
-        if (cameraRef.current) {
-            cameraRef.current.position.x += (carRef.current.position.x - cameraRef.current.position.x) * 0.05;
-            cameraRef.current.position.z += (carRef.current.position.z + 20 - cameraRef.current.position.z) * 0.05;
-            cameraRef.current.lookAt(carRef.current.position);
-        }
-
-        animId = requestAnimationFrame(animateMovement);
+      animId = requestAnimationFrame(animateMovement);
     };
 
     animId = requestAnimationFrame(animateMovement);
@@ -1203,7 +1368,7 @@ about: {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-7xl min-h-[800px] bg-black rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
+      <div className="w-full max-w-7xl h-[850px] bg-slate-950 rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
         <div className="grid grid-cols-5 h-full">
           
           {/* --- Sidebar (Refactored Layout) --- */}
@@ -1218,8 +1383,8 @@ about: {
               <p className="text-gray-400 text-sm">Where do you want to go?</p>
             </div>
             
-            {/* 2. Destination List (Moved to Top) */}
-            <div className="p-4 space-y-3 bg-slate-900" style={{ maxHeight: "40%" }}>
+            {/* 2. Destination List */}
+            <div className="p-4 space-y-3 bg-slate-900 flex-1 overflow-y-auto">
               {DESTINATIONS.map(dest => (
                 <button
                   key={dest.id}
@@ -1235,7 +1400,7 @@ about: {
                   </div>
                   <div className="flex-1">
                     <div className="font-semibold text-slate-200">{dest.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Coords: {dest.position3D.x}, {dest.position3D.z}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Coords: {dest.stopPosition.x}, {dest.stopPosition.z}</div>
                   </div>
                   {currentPosition.id === dest.id && <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></div>}
                 </button>
@@ -1244,36 +1409,35 @@ about: {
           </div>
           
           {/* --- 3D Viewport --- */}
-          <div className="col-span-3 bg-black flex flex-col relative w-full">
-            <canvas ref={canvasRef} className="w-full h-[100px] block cursor-default" />
+          <div className="col-span-3 bg-[#0a0a15] relative w-full h-full overflow-hidden">
+            <canvas ref={canvasRef} className="w-full h-full block cursor-default" />
             
-            {/* Overlay UI */}
-            <div className="absolute top-6 left-6 right-6 flex justify-between pointer-events-none">
-                <div className="bg-slate-900/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-slate-200 text-sm font-mono">
-                    SYS.STATUS: {isNavigating ? 'NAVIGATING' : 'IDLE'}
-                </div>
+            {/* Overlay UI: Status Badge */}
+            <div className="absolute top-6 left-6 pointer-events-none">
+              <div className="bg-slate-900/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-slate-200 text-sm font-mono shadow-lg">
+                SYS.STATUS: {isNavigating ? 'NAVIGATING' : 'IDLE'}
+              </div>
             </div>
 
-            {/* Status Pill */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-6 py-3 rounded-full border border-slate-700 flex items-center gap-3 shadow-xl">
-                 <div className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></div>
-                 <span className="text-slate-200 text-sm font-medium">
-                    {isNavigating ? "Autonomous Mode Active..." : "Vehicle Parked"}
-                 </span>
+            {/* Circular Minimap Overlay (Top-Right) */}
+            <div className="absolute top-6 right-6 w-48 h-48 rounded-full overflow-hidden border-2 border-slate-700 shadow-2xl bg-[#0f1419]">
+              <VectorMap
+                currentPosition={currentPosition}
+                destinations={DESTINATIONS}
+                roads={ROADS}
+                isNavigating={isNavigating}
+                navigationProgress={navigationProgress}
+                currentRoute={currentRoute}
+              />
             </div>
-          {/* --- Circular Minimap Overlay --- */}
-          <div className="absolute top-6 right-6 w-48 h-48 rounded-full overflow-hidden border-2 border-slate-700 shadow-lg bg-[#0f1419]">
-            <VectorMap
-              currentPosition={currentPosition}
-              destinations={DESTINATIONS}
-              roads={ROADS}
-              isNavigating={isNavigating}
-              navigationProgress={navigationProgress}
-              currentRoute={currentRoute}
-            />
-          </div>
 
-
+            {/* Status Pill (Bottom-Center) */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-6 py-3 rounded-full border border-slate-700 flex items-center gap-3 shadow-xl pointer-events-none">
+              <div className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></div>
+              <span className="text-slate-200 text-sm font-medium">
+                {isNavigating ? "Autonomous Mode Active..." : "Vehicle Parked"}
+              </span>
+            </div>
           </div>
 
         </div>

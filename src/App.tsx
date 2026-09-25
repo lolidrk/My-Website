@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, BookOpen, User, Home, Navigation2, MapPin, Layers, Compass } from 'lucide-react';
+import { FileText, BookOpen, User, Home, Navigation2, MapPin, Layers, Compass, RotateCcw } from 'lucide-react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import mcAfeeImage from '../src/assets/McAfeeThirthyFive.png';
 import thysRanst from '../src/assets/ThysRanst.png';
 
@@ -260,6 +261,8 @@ const AutonomousBlog = () => {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const carRef = useRef<THREE.Group | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const isResettingCameraRef = useRef<boolean>(false);
   const buildingsRef = useRef<THREE.Group[]>([]);
 
   const [currentPosition, setCurrentPosition] = useState(DESTINATIONS[0]);
@@ -819,6 +822,31 @@ const AutonomousBlog = () => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setClearColor(0x0a0a15, 1);
 
+    // OrbitControls for interactive 3D navigation
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2, -60);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.enablePan = false;
+    controls.minDistance = 15;
+    controls.maxDistance = 160;
+    controls.minPolarAngle = 0.15;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
+    controls.addEventListener('start', () => {
+      isResettingCameraRef.current = false;
+    });
+    controls.update();
+    controlsRef.current = controls;
+
     // Responsive Resize Observer
     const handleResize = () => {
       if (!container || !cameraRef.current) return;
@@ -1121,6 +1149,40 @@ const AutonomousBlog = () => {
       } else if (carRef.current) {
         carRef.current.position.y = 0.1;
       }
+
+      // Smooth camera reset animation
+      if (isResettingCameraRef.current && cameraRef.current && carRef.current && controlsRef.current) {
+        const carX = carRef.current.position.x;
+        const carZ = carRef.current.position.z;
+        const targetCamX = carX * 0.35;
+        const targetCamY = 48;
+        const targetCamZ = carZ * 0.35;
+
+        cameraRef.current.position.x += (targetCamX - cameraRef.current.position.x) * 0.08;
+        cameraRef.current.position.y += (targetCamY - cameraRef.current.position.y) * 0.08;
+        cameraRef.current.position.z += (targetCamZ - cameraRef.current.position.z) * 0.08;
+
+        controlsRef.current.target.x += (carX - controlsRef.current.target.x) * 0.08;
+        controlsRef.current.target.y += (2 - controlsRef.current.target.y) * 0.08;
+        controlsRef.current.target.z += (carZ - controlsRef.current.target.z) * 0.08;
+
+        cameraRef.current.lookAt(controlsRef.current.target);
+
+        const distCam = Math.hypot(
+          cameraRef.current.position.x - targetCamX,
+          cameraRef.current.position.y - targetCamY,
+          cameraRef.current.position.z - targetCamZ
+        );
+
+        if (distCam < 0.1) {
+          cameraRef.current.position.set(targetCamX, targetCamY, targetCamZ);
+          controlsRef.current.target.set(carX, 2, carZ);
+          controlsRef.current.update();
+          isResettingCameraRef.current = false;
+        }
+      } else if (controlsRef.current && controlsRef.current.enabled) {
+        controlsRef.current.update();
+      }
       
       renderer.render(scene, camera);
     };
@@ -1129,9 +1191,30 @@ const AutonomousBlog = () => {
     return () => {
       cancelAnimationFrame(animId);
       resizeObserver.disconnect();
+      controls.dispose();
       renderer.dispose();
     };
   }, []);
+
+  // Sync controls with navigation state
+  useEffect(() => {
+    if (!controlsRef.current) return;
+    if (isNavigating) {
+      controlsRef.current.enabled = false;
+      isResettingCameraRef.current = false;
+    } else {
+      controlsRef.current.enabled = true;
+      if (carRef.current) {
+        controlsRef.current.target.set(carRef.current.position.x, 2, carRef.current.position.z);
+        controlsRef.current.update();
+      }
+    }
+  }, [isNavigating]);
+
+  const handleResetView = () => {
+    if (isNavigating) return;
+    isResettingCameraRef.current = true;
+  };
 
   // --- Navigation Logic ---
   const navigateTo = (destination: any) => {
@@ -1238,6 +1321,9 @@ const AutonomousBlog = () => {
           cameraRef.current.position.y += (targetCamY - cameraRef.current.position.y) * 0.05;
           cameraRef.current.position.z += (targetCamZ - cameraRef.current.position.z) * 0.05;
           cameraRef.current.lookAt(carX, 2, carZ);
+          if (controlsRef.current) {
+            controlsRef.current.target.set(carX, 2, carZ);
+          }
         }
       }
 
@@ -1409,13 +1495,34 @@ about: {
           </div>
           
           {/* --- 3D Viewport --- */}
-          <div className="col-span-3 bg-[#0a0a15] relative w-full h-full overflow-hidden">
-            <canvas ref={canvasRef} className="w-full h-full block cursor-default" />
+          <div className="col-span-3 bg-[#0a0a15] relative w-full h-full overflow-hidden select-none">
+            <canvas 
+              ref={canvasRef} 
+              onContextMenu={(e) => e.preventDefault()}
+              className={`w-full h-full block ${isNavigating ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`} 
+            />
             
-            {/* Overlay UI: Status Badge */}
-            <div className="absolute top-6 left-6 pointer-events-none">
-              <div className="bg-slate-900/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-slate-200 text-sm font-mono shadow-lg">
-                SYS.STATUS: {isNavigating ? 'NAVIGATING' : 'IDLE'}
+            {/* Overlay UI: Status Badge & Camera Controls */}
+            <div className="absolute top-6 left-6 flex flex-col gap-2 pointer-events-none z-10">
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-900/80 backdrop-blur px-3.5 py-2 rounded-lg border border-slate-700 text-slate-200 text-xs font-mono shadow-lg flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-emerald-500 animate-pulse' : 'bg-blue-400'}`}></span>
+                  <span>SYS.STATUS: {isNavigating ? 'NAVIGATING' : 'IDLE'}</span>
+                </div>
+                
+                <button
+                  onClick={handleResetView}
+                  disabled={isNavigating}
+                  className="pointer-events-auto bg-slate-900/80 hover:bg-slate-800 backdrop-blur px-3 py-2 rounded-lg border border-slate-700 hover:border-blue-500/50 text-slate-300 hover:text-white text-xs font-mono shadow-lg flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95"
+                  title="Reset viewpoint to default camera angle"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-blue-400 transition-transform group-hover:-rotate-45" />
+                  <span>RESET VIEW</span>
+                </button>
+              </div>
+
+              <div className="text-[11px] text-slate-400/80 font-mono bg-slate-900/60 backdrop-blur px-2.5 py-1 rounded border border-slate-800/80 w-fit pointer-events-none flex items-center gap-1.5 shadow">
+                <span>🖱️ Click & drag to rotate • Scroll to zoom</span>
               </div>
             </div>
 

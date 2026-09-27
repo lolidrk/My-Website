@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, BookOpen, User, Home, Navigation2, MapPin, Layers, Compass, RotateCcw } from 'lucide-react';
+import { FileText, BookOpen, User, Home, Navigation2, Compass, RotateCcw, Map as MapIcon, Car, Layers } from 'lucide-react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import mcAfeeImage from '../src/assets/McAfeeThirthyFive.png';
-import thysRanst from '../src/assets/ThysRanst.png';
+import { blogPosts, type BlogPost } from './data/blogPosts';
 
-// --- Configuration Constants ---
+// --- Types & Constants ---
 export interface Waypoint {
   name?: string;
   x: number;
@@ -13,135 +12,345 @@ export interface Waypoint {
   heading?: number;
 }
 
-const cornerArcRadius = 8;
-const cornerOffset = 52;
+export interface DestinationItem {
+  id: string;
+  name: string;
+  sector: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  coords: { lat: number; lng: number };
+  position3D: { x: number; z: number };
+  stopPosition: { x: number; z: number };
+  defaultHeading: number;
+  color: string;
+  buildingColor: number;
+  height: number;
+  camOffset: { x: number; y: number; z: number };
+  email?: string;
+}
 
-const getCircuitArcPoints = (cx: number, cz: number, a1: number, a2: number): Waypoint[] => {
+// 4 Sector Destinations (Spaced far apart across the city)
+const DESTINATIONS: DestinationItem[] = [
+  { 
+    id: 'home', 
+    name: 'Home Base', 
+    sector: 'NORTH SECTOR',
+    icon: Home, 
+    coords: { lat: 12.9698, lng: 77.7500 },
+    position3D: { x: 0, z: -145 },
+    stopPosition: { x: 0, z: -130 },
+    defaultHeading: Math.PI / 2, // Facing East along North Avenue
+    color: '#00f0ff',
+    buildingColor: 0x00f0ff,
+    height: 18,
+    camOffset: { x: 0, y: 26, z: 38 }
+  },
+  { 
+    id: 'publications', 
+    name: 'Publications Hub', 
+    sector: 'EAST SECTOR',
+    icon: FileText, 
+    coords: { lat: 12.9850, lng: 77.7300 },
+    position3D: { x: 145, z: 0 },
+    stopPosition: { x: 130, z: 0 },
+    defaultHeading: Math.PI, // Facing South along East Avenue
+    color: '#10b981',
+    buildingColor: 0x10b981,
+    height: 26,
+    camOffset: { x: -38, y: 28, z: 0 }
+  },
+  { 
+    id: 'blog', 
+    name: 'Blog Tower', 
+    sector: 'SOUTH SECTOR',
+    icon: BookOpen, 
+    coords: { lat: 12.9520, lng: 77.7650 },
+    position3D: { x: 0, z: 145 },
+    stopPosition: { x: 0, z: 130 },
+    defaultHeading: -Math.PI / 2, // Facing West along South Avenue
+    color: '#f59e0b',
+    buildingColor: 0xf59e0b,
+    height: 38,
+    camOffset: { x: 0, y: 32, z: -42 }
+  },
+  { 
+    id: 'about', 
+    name: 'About Plaza', 
+    sector: 'WEST SECTOR',
+    icon: User, 
+    coords: { lat: 12.9600, lng: 77.7400 },
+    position3D: { x: -145, z: 0 },
+    stopPosition: { x: -130, z: 0 },
+    defaultHeading: 0, // Facing North along West Avenue
+    color: '#8b5cf6',
+    buildingColor: 0x8b5cf6,
+    height: 16,
+    camOffset: { x: 38, y: 26, z: 0 },
+    email: 'kalyanikulkarni2002@gmail.com'
+  },
+];
+
+// Helper to generate smooth circular corner arcs for car turning
+const generateCornerArc = (
+  cx: number, cz: number,
+  r: number,
+  startAngle: number, endAngle: number,
+  steps: number = 6
+): Waypoint[] => {
   const pts: Waypoint[] = [];
-  const steps = 4;
-  for (let s = 1; s < steps; s++) {
-    const a = a1 + (s / steps) * (a2 - a1);
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const a = startAngle + t * (endAngle - startAngle);
     pts.push({
-      name: `arc_${cx}_${cz}_${s}`,
-      x: cx + cornerArcRadius * Math.cos(a),
-      z: cz + cornerArcRadius * Math.sin(a),
+      x: cx + r * Math.cos(a),
+      z: cz + r * Math.sin(a),
     });
   }
   return pts;
 };
 
-// 24 waypoints along the closed circuit
-const CIRCUIT_WAYPOINTS: Waypoint[] = [
-  { name: 'home', x: 0, z: -60, heading: Math.PI / 2 },
-  { name: 'top_right_start', x: 52, z: -60 },
-  ...getCircuitArcPoints(cornerOffset, -cornerOffset, 3 * Math.PI / 2, 2 * Math.PI),
-  { name: 'top_right_end', x: 60, z: -52 },
-  { name: 'publications', x: 60, z: 0, heading: 0 },
-  { name: 'bot_right_start', x: 60, z: 52 },
-  ...getCircuitArcPoints(cornerOffset, cornerOffset, 0, Math.PI / 2),
-  { name: 'bot_right_end', x: 52, z: 60 },
-  { name: 'blog', x: 0, z: 60, heading: -Math.PI / 2 },
-  { name: 'bot_left_start', x: -52, z: 60 },
-  ...getCircuitArcPoints(-cornerOffset, cornerOffset, Math.PI / 2, Math.PI),
-  { name: 'bot_left_end', x: -60, z: 52 },
-  { name: 'about', x: -60, z: 0, heading: Math.PI },
-  { name: 'top_left_start', x: -60, z: -52 },
-  ...getCircuitArcPoints(-cornerOffset, -cornerOffset, Math.PI, 3 * Math.PI / 2),
-  { name: 'top_left_end', x: -52, z: -60 },
-];
+// Route calculator across the city grid
+const CORNER_R = 12;
+const CORNER_OFFSET = 118; // 130 - 12
 
-const computeRoute = (fromId: string, toId: string): Waypoint[] => {
-  const startIdx = CIRCUIT_WAYPOINTS.findIndex(p => p.name === fromId);
-  const endIdx = CIRCUIT_WAYPOINTS.findIndex(p => p.name === toId);
-  if (startIdx === -1 || endIdx === -1) return [];
+const computeCityRoute = (fromId: string, toId: string): Waypoint[] => {
+  if (fromId === toId) return [];
 
-  const N = CIRCUIT_WAYPOINTS.length;
-  let cwDist = (endIdx - startIdx + N) % N;
-  let ccwDist = (startIdx - endIdx + N) % N;
+  // Corner arcs
+  const trCorner = generateCornerArc(CORNER_OFFSET, -CORNER_OFFSET, CORNER_R, -Math.PI / 2, 0); // NE
+  const brCorner = generateCornerArc(CORNER_OFFSET, CORNER_OFFSET, CORNER_R, 0, Math.PI / 2); // SE
+  const blCorner = generateCornerArc(-CORNER_OFFSET, CORNER_OFFSET, CORNER_R, Math.PI / 2, Math.PI); // SW
+  const tlCorner = generateCornerArc(-CORNER_OFFSET, -CORNER_OFFSET, CORNER_R, Math.PI, 3 * Math.PI / 2); // NW
 
-  const path: Waypoint[] = [];
-  if (cwDist <= ccwDist) {
-    for (let i = 0; i <= cwDist; i++) {
-      path.push(CIRCUIT_WAYPOINTS[(startIdx + i) % N]);
-    }
-  } else {
-    for (let i = 0; i <= ccwDist; i++) {
-      path.push(CIRCUIT_WAYPOINTS[(startIdx - i + N) % N]);
-    }
-  }
-  return path;
+  const routes: Record<string, Waypoint[]> = {
+    // 1. Home -> Publications (via East Avenue)
+    'home->publications': [
+      { x: 0, z: -130 },
+      { x: CORNER_OFFSET, z: -130 },
+      ...trCorner,
+      { x: 130, z: -CORNER_OFFSET },
+      { x: 130, z: 0, heading: Math.PI }
+    ],
+    // 2. Home -> Blog (straight down Central Boulevard)
+    'home->blog': [
+      { x: 0, z: -130 },
+      { x: 0, z: -65 },
+      { x: 0, z: 0 },
+      { x: 0, z: 65 },
+      { x: 0, z: 130, heading: Math.PI }
+    ],
+    // 3. Home -> About (via West Avenue)
+    'home->about': [
+      { x: 0, z: -130 },
+      { x: -CORNER_OFFSET, z: -130 },
+      ...tlCorner.slice().reverse(),
+      { x: -130, z: -CORNER_OFFSET },
+      { x: -130, z: 0, heading: Math.PI }
+    ],
+
+    // 4. Publications -> Blog (via South Avenue)
+    'publications->blog': [
+      { x: 130, z: 0 },
+      { x: 130, z: CORNER_OFFSET },
+      ...brCorner,
+      { x: CORNER_OFFSET, z: 130 },
+      { x: 0, z: 130, heading: -Math.PI / 2 }
+    ],
+    // 5. Publications -> About (straight across Central Boulevard)
+    'publications->about': [
+      { x: 130, z: 0 },
+      { x: 65, z: 0 },
+      { x: 0, z: 0 },
+      { x: -65, z: 0 },
+      { x: -130, z: 0, heading: -Math.PI / 2 }
+    ],
+    // 6. Publications -> Home (via North Avenue)
+    'publications->home': [
+      { x: 130, z: 0 },
+      { x: 130, z: -CORNER_OFFSET },
+      ...trCorner.slice().reverse(),
+      { x: CORNER_OFFSET, z: -130 },
+      { x: 0, z: -130, heading: -Math.PI / 2 }
+    ],
+
+    // 7. Blog -> About (via West Avenue)
+    'blog->about': [
+      { x: 0, z: 130 },
+      { x: -CORNER_OFFSET, z: 130 },
+      ...blCorner,
+      { x: -130, z: CORNER_OFFSET },
+      { x: -130, z: 0, heading: 0 }
+    ],
+    // 8. Blog -> Home (straight North down Central Boulevard)
+    'blog->home': [
+      { x: 0, z: 130 },
+      { x: 0, z: 65 },
+      { x: 0, z: 0 },
+      { x: 0, z: -65 },
+      { x: 0, z: -130, heading: 0 }
+    ],
+    // 9. Blog -> Publications (via East Avenue)
+    'blog->publications': [
+      { x: 0, z: 130 },
+      { x: CORNER_OFFSET, z: 130 },
+      ...brCorner.slice().reverse(),
+      { x: 130, z: CORNER_OFFSET },
+      { x: 130, z: 0, heading: 0 }
+    ],
+
+    // 10. About -> Home (via North Avenue)
+    'about->home': [
+      { x: -130, z: 0 },
+      { x: -130, z: -CORNER_OFFSET },
+      ...tlCorner,
+      { x: -CORNER_OFFSET, z: -130 },
+      { x: 0, z: -130, heading: Math.PI / 2 }
+    ],
+    // 11. About -> Publications (straight East across Central Boulevard)
+    'about->publications': [
+      { x: -130, z: 0 },
+      { x: -65, z: 0 },
+      { x: 0, z: 0 },
+      { x: 65, z: 0 },
+      { x: 130, z: 0, heading: Math.PI / 2 }
+    ],
+    // 12. About -> Blog (via South Avenue)
+    'about->blog': [
+      { x: -130, z: 0 },
+      { x: -130, z: CORNER_OFFSET },
+      ...blCorner.slice().reverse(),
+      { x: -CORNER_OFFSET, z: 130 },
+      { x: 0, z: 130, heading: Math.PI / 2 }
+    ],
+  };
+
+  return routes[`${fromId}->${toId}`] || [];
 };
 
-// 4 Straight Roads forming the sides of the circuit
-const ROADS = [
-  { from: { x: -52, z: -60 }, to: { x: 52, z: -60 } }, // North
-  { from: { x: 60, z: -52 }, to: { x: 60, z: 52 } },   // East
-  { from: { x: 52, z: 60 }, to: { x: -52, z: 60 } },   // South
-  { from: { x: -60, z: 52 }, to: { x: -60, z: -52 } }, // West
-];
+// --- Plots of Land Layout ---
+export interface LandPlot {
+  id: string;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  type: 'hero' | 'park' | 'cantilever' | 'stepped' | 'wedge' | 'spire' | 'commercial' | 'lowrise';
+  heroId?: string;
+}
 
-// 4 Destinations along the 4 sides of the loop
-const DESTINATIONS = [
-  { 
-    id: 'home', 
-    name: 'Home Base', 
-    icon: Home, 
-    coords: { lat: 12.9698, lng: 77.7500 },
-    position3D: { x: 0, z: -74 },
-    stopPosition: { x: 0, z: -60 },
-    color: '#3b82f6',
-    buildingColor: 0x3b82f6,
-    height: 8
-  },
-  { 
-    id: 'publications', 
-    name: 'Publications Hub', 
-    icon: FileText, 
-    coords: { lat: 12.9850, lng: 77.7300 },
-    position3D: { x: 74, z: 0 },
-    stopPosition: { x: 60, z: 0 },
-    color: '#10b981',
-    buildingColor: 0x10b981,
-    height: 15
-  },
-  { 
-    id: 'blog', 
-    name: 'Blog Tower', 
-    icon: BookOpen, 
-    coords: { lat: 12.9520, lng: 77.7650 },
-    position3D: { x: 0, z: 74 },
-    stopPosition: { x: 0, z: 60 },
-    color: '#f59e0b',
-    buildingColor: 0xf59e0b,
-    height: 12
-  },
-  { 
-    id: 'about', 
-    name: 'About Plaza', 
-    icon: User, 
-    coords: { lat: 12.9600, lng: 77.7400 },
-    position3D: { x: -74, z: 0 },
-    stopPosition: { x: -60, z: 0 },
-    color: '#8b5cf6',
-    buildingColor: 0x8b5cf6,
-    height: 10,
-    email: 'kalyanikulkarni2002@gmail.com'
-  },
-];
+// Generate the urban plot grid (matching Picture 2)
+const generateLandPlots = (): LandPlot[] => {
+  const plots: LandPlot[] = [];
 
-// --- Vector Map Component ---
-const VectorMap = ({ currentPosition, destinations, isNavigating, navigationProgress, currentRoute }: any) => {
-  const viewBoxSize = 200;
+  // 1. Hero destination plots
+  plots.push({
+    id: 'hero_home',
+    minX: -35, maxX: 35,
+    minZ: -160, maxZ: -135,
+    type: 'hero',
+    heroId: 'home'
+  });
+  plots.push({
+    id: 'hero_publications',
+    minX: 135, maxX: 160,
+    minZ: -35, maxZ: 35,
+    type: 'hero',
+    heroId: 'publications'
+  });
+  plots.push({
+    id: 'hero_blog',
+    minX: -35, maxX: 35,
+    minZ: 135, maxZ: 160,
+    type: 'hero',
+    heroId: 'blog'
+  });
+  plots.push({
+    id: 'hero_about',
+    minX: -160, maxX: -135,
+    minZ: -35, maxZ: 35,
+    type: 'hero',
+    heroId: 'about'
+  });
+
+  // 2. Central Park (Grand park plot in center)
+  plots.push({
+    id: 'park_center_nw',
+    minX: -55, maxX: -6,
+    minZ: -55, maxZ: -6,
+    type: 'park'
+  });
+  plots.push({
+    id: 'park_center_se',
+    minX: 6, maxX: 55,
+    minZ: 6, maxZ: 55,
+    type: 'park'
+  });
+
+  // 3. Tree plots in perimeter quadrants (Picture 1 & Picture 2 style)
+  plots.push({ id: 'park_nw', minX: -125, maxX: -72, minZ: -125, maxZ: -72, type: 'park' });
+  plots.push({ id: 'park_ne', minX: 72, maxX: 125, minZ: -125, maxZ: -72, type: 'park' });
+  plots.push({ id: 'park_sw', minX: -125, maxX: -72, minZ: 72, maxZ: 125, type: 'park' });
+  plots.push({ id: 'park_se', minX: 72, maxX: 125, minZ: 72, maxZ: 125, type: 'park' });
+  plots.push({ id: 'park_mid_w', minX: -125, maxX: -72, minZ: -28, maxZ: 28, type: 'park' });
+  plots.push({ id: 'park_mid_e', minX: 72, maxX: 125, minZ: -28, maxZ: 28, type: 'park' });
+
+  // 4. Wireframe Skyscraper & Commercial Plots (Picture 1 style)
+  // Cantilever Towers
+  plots.push({ id: 'bld_cantilever_1', minX: -58, maxX: -8, minZ: -125, maxZ: -72, type: 'cantilever' });
+  plots.push({ id: 'bld_cantilever_2', minX: 8, maxX: 58, minZ: 72, maxZ: 125, type: 'cantilever' });
+  plots.push({ id: 'bld_cantilever_3', minX: -155, maxX: -136, minZ: -125, maxZ: -72, type: 'cantilever' });
+
+  // Stepped Setback Towers
+  plots.push({ id: 'bld_stepped_1', minX: 8, maxX: 58, minZ: -125, maxZ: -72, type: 'stepped' });
+  plots.push({ id: 'bld_stepped_2', minX: -58, maxX: -8, minZ: 72, maxZ: 125, type: 'stepped' });
+  plots.push({ id: 'bld_stepped_3', minX: 136, maxX: 155, minZ: 72, maxZ: 125, type: 'stepped' });
+
+  // Slanted Wedge Roof Towers
+  plots.push({ id: 'bld_wedge_1', minX: -55, maxX: -8, minZ: 8, maxZ: 55, type: 'wedge' });
+  plots.push({ id: 'bld_wedge_2', minX: 8, maxX: 55, minZ: -55, maxZ: -8, type: 'wedge' });
+  plots.push({ id: 'bld_wedge_3', minX: 136, maxX: 155, minZ: -125, maxZ: -72, type: 'wedge' });
+
+  // Spire Megatowers
+  plots.push({ id: 'bld_spire_1', minX: -155, maxX: -136, minZ: 72, maxZ: 125, type: 'spire' });
+  plots.push({ id: 'bld_spire_2', minX: 136, maxX: 155, minZ: -28, maxZ: 28, type: 'spire' });
+
+  // Commercial Mid-Rise & Matrix Blocks
+  plots.push({ id: 'bld_comm_1', minX: -155, maxX: -136, minZ: -155, maxZ: -136, type: 'commercial' });
+  plots.push({ id: 'bld_comm_2', minX: 136, maxX: 155, minZ: -155, maxZ: -136, type: 'commercial' });
+  plots.push({ id: 'bld_comm_3', minX: -155, maxX: -136, minZ: 136, maxZ: 155, type: 'commercial' });
+  plots.push({ id: 'bld_comm_4', minX: 136, maxX: 155, minZ: 136, maxZ: 155, type: 'commercial' });
+
+  // Lowrise Complexes
+  plots.push({ id: 'bld_low_1', minX: -125, maxX: -72, minZ: -155, maxZ: -136, type: 'lowrise' });
+  plots.push({ id: 'bld_low_2', minX: 72, maxX: 125, minZ: -155, maxZ: -136, type: 'lowrise' });
+  plots.push({ id: 'bld_low_3', minX: -125, maxX: -72, minZ: 136, maxZ: 155, type: 'lowrise' });
+  plots.push({ id: 'bld_low_4', minX: 72, maxX: 125, minZ: 136, maxZ: 155, type: 'lowrise' });
+
+  return plots;
+};
+
+// --- Vector 2D Map Component (Shows Plots & Road Network) ---
+interface VectorMapProps {
+  currentPosition: DestinationItem;
+  destinations: DestinationItem[];
+  isNavigating: boolean;
+  navigationProgress: number;
+  currentRoute: {
+    path: Waypoint[];
+    destination: DestinationItem | null;
+  };
+  plots: LandPlot[];
+}
+
+const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, isNavigating, navigationProgress, currentRoute, plots }) => {
+  const viewBoxSize = 340;
   const offset = viewBoxSize / 2;
 
-  // Calculate dynamic car position for the 2D map
   const getCarPosition = () => {
     if (!isNavigating || !currentRoute.path || currentRoute.path.length === 0) {
-      return currentPosition.stopPosition || { x: 0, z: -60 };
+      return currentPosition.stopPosition || { x: 0, z: -130 };
     }
-    
     const totalSegments = currentRoute.path.length - 1;
-    if (totalSegments <= 0) return currentPosition.stopPosition || { x: 0, z: -60 };
+    if (totalSegments <= 0) return currentPosition.stopPosition || { x: 0, z: -130 };
 
     const progressPerSegment = 1 / totalSegments;
     const currentSegmentIndex = Math.min(
@@ -152,8 +361,7 @@ const VectorMap = ({ currentPosition, destinations, isNavigating, navigationProg
 
     const p1 = currentRoute.path[currentSegmentIndex];
     const p2 = currentRoute.path[currentSegmentIndex + 1];
-
-    if (!p1 || !p2) return currentPosition.stopPosition || { x: 0, z: -60 };
+    if (!p1 || !p2) return currentPosition.stopPosition || { x: 0, z: -130 };
 
     return {
       x: p1.x + (p2.x - p1.x) * segmentProgress,
@@ -176,52 +384,89 @@ const VectorMap = ({ currentPosition, destinations, isNavigating, navigationProg
   }
 
   return (
-    <div className="w-full h-full bg-[#0f1419] relative overflow-hidden select-none">
-      {/* Grid Background */}
+    <div className="w-full h-full bg-[#050811] relative overflow-hidden select-none">
+      {/* Background Matrix Grid */}
       <svg className="absolute inset-0 w-full h-full opacity-20" width="100%" height="100%">
         <defs>
-          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#4a5568" strokeWidth="0.5"/>
+          <pattern id="miniGrid" width="16" height="16" patternUnits="userSpaceOnUse">
+            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#22c55e" strokeWidth="0.4"/>
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
+        <rect width="100%" height="100%" fill="url(#miniGrid)" />
       </svg>
 
-      {/* Main Map Content */}
       <svg 
         viewBox={`-${offset} -${offset} ${viewBoxSize} ${viewBoxSize}`} 
         className="w-full h-full"
-        style={{ padding: '16px' }}
+        style={{ padding: '8px' }}
       >
-        {/* Roads: Continuous Circuit with Curved Corners */}
-        <rect 
-          x="-60" y="-60" width="120" height="120" rx="8" ry="8"
-          fill="none" stroke="#2d3748" strokeWidth="8" strokeLinejoin="round" 
-        />
-        <rect 
-          x="-60" y="-60" width="120" height="120" rx="8" ry="8"
-          fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3 3" strokeLinejoin="round" 
-        />
-
-        {/* Destination Zones */}
-        {destinations.map((dest: any) => (
-          <g key={dest.id} transform={`translate(${dest.position3D.x}, ${dest.position3D.z})`}>
-            {/* Connection dashed line */}
-            <line 
-              x1="0" y1="0" 
-              x2={dest.stopPosition.x - dest.position3D.x} 
-              y2={dest.stopPosition.z - dest.position3D.z} 
-              stroke="#475569" strokeWidth="2" strokeDasharray="2 2" 
+        {/* Render Plots of Land (Picture 2 Cadastral Style) */}
+        {plots && plots.map((p: LandPlot) => (
+          <g key={p.id}>
+            <rect
+              x={p.minX}
+              y={p.minZ}
+              width={p.maxX - p.minX}
+              height={p.maxZ - p.minZ}
+              fill={p.type === 'park' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(10, 16, 30, 0.7)'}
+              stroke={p.type === 'park' ? '#10b981' : '#22c55e'}
+              strokeWidth={p.type === 'park' ? 1.2 : 0.8}
+              strokeOpacity={0.65}
+              rx={2}
             />
-            
-            {/* Building Marker */}
-            <rect x="-6" y="-6" width="12" height="12" fill={dest.color} rx="2" stroke="#0a0a15" strokeWidth="1.5"/>
-            
-            {/* Label */}
+            {p.type === 'park' && (
+              <circle 
+                cx={(p.minX + p.maxX) / 2} 
+                cy={(p.minZ + p.maxZ) / 2} 
+                r={2.5} 
+                fill="#10b981" 
+                opacity={0.8} 
+              />
+            )}
+          </g>
+        ))}
+
+        {/* Major Road Avenues (North, East, South, West, and Central Cross) */}
+        {/* Outer Loop */}
+        <rect 
+          x="-130" y="-130" width="260" height="260" rx="12" ry="12"
+          fill="none" stroke="#00ff66" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.8" 
+        />
+        {/* Central North-South Boulevard */}
+        <line x1="0" y1="-130" x2="0" y2="130" stroke="#00ff66" strokeWidth="1" strokeDasharray="3 3" opacity="0.7"/>
+        {/* Central East-West Boulevard */}
+        <line x1="-130" y1="0" x2="130" y2="0" stroke="#00ff66" strokeWidth="1" strokeDasharray="3 3" opacity="0.7"/>
+        {/* Intermediate grid roads */}
+        <line x1="-65" y1="-130" x2="-65" y2="130" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
+        <line x1="65" y1="-130" x2="65" y2="130" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
+        <line x1="-130" y1="-65" x2="130" y2="-65" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
+        <line x1="-130" y1="65" x2="130" y2="65" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
+
+        {/* Active Navigation Route */}
+        {isNavigating && currentRoute.path && currentRoute.path.length > 1 && (
+          <polyline
+            points={currentRoute.path.map((pt: Waypoint) => `${pt.x},${pt.z}`).join(' ')}
+            fill="none"
+            stroke="#00f0ff"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.9"
+          />
+        )}
+
+        {/* Destination Markers */}
+        {destinations.map((dest: DestinationItem) => (
+          <g key={dest.id} transform={`translate(${dest.position3D.x}, ${dest.position3D.z})`}>
+            <circle r="7" fill={dest.color} opacity="0.25" />
+            <circle r="4" fill={dest.color} stroke="#ffffff" strokeWidth="1.2" />
             <text 
-              y={dest.position3D.z < -40 ? -10 : 13} 
-              textAnchor="middle" fill="#94a3b8" fontSize="5" fontWeight="600" 
-              style={{ textShadow: '0px 1px 2px black' }}
+              y={dest.position3D.z < -50 ? -9 : 14} 
+              textAnchor="middle" 
+              fill="#ffffff" 
+              fontSize="8" 
+              fontWeight="bold"
+              style={{ textShadow: '0px 1px 3px black' }}
             >
               {dest.name}
             </text>
@@ -230,28 +475,130 @@ const VectorMap = ({ currentPosition, destinations, isNavigating, navigationProg
 
         {/* Car Puck */}
         <g transform={`translate(${carPos.x}, ${carPos.z}) rotate(${rotation})`}>
-          <circle r="4" fill="#3b82f6" stroke="white" strokeWidth="1.5" />
-          <path d="M 0 -7 L 3 -3 L -3 -3 Z" fill="#60a5fa" />
+          <circle r="6" fill="#00f0ff" opacity="0.3" />
+          <circle r="4.2" fill="#3b82f6" stroke="#ffffff" strokeWidth="1.5" />
+          <path d="M 0 -8 L 3.5 -3 L -3.5 -3 Z" fill="#00f0ff" />
         </g>
       </svg>
       
-      <div className="absolute top-3 right-3">
-        <div className="bg-slate-900/80 p-1 rounded-full border border-slate-700 shadow-md text-white">
-          <Compass size={13} className="text-blue-400" />
+      <div className="absolute top-2.5 right-2.5">
+        <div className="bg-slate-900/90 p-1.5 rounded-full border border-slate-700 shadow text-cyan-400">
+          <Compass size={14} />
         </div>
       </div>
     </div>
   );
 };
 
+// --- Procedural Canvas Texture Generators ---
+const createCyberRoadTexture = (): THREE.Texture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.Texture();
+
+  // Dark cyber tarmac
+  ctx.fillStyle = '#060913';
+  ctx.fillRect(0, 0, 128, 256);
+
+  // Subtle noise
+  for (let i = 0; i < 300; i++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.02)';
+    ctx.fillRect(Math.random() * 128, Math.random() * 256, 2, 2);
+  }
+
+  // Glowing neon green edge curbs
+  ctx.strokeStyle = '#00ff66';
+  ctx.lineWidth = 4;
+  ctx.shadowColor = '#00ff66';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(3, 0); ctx.lineTo(3, 256);
+  ctx.moveTo(125, 0); ctx.lineTo(125, 256);
+  ctx.stroke();
+
+  // Center dashed green line
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 3;
+  ctx.shadowBlur = 6;
+  ctx.setLineDash([28, 20]);
+  ctx.beginPath();
+  ctx.moveTo(64, 0); ctx.lineTo(64, 256);
+  ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+};
+
+const createCyberSignTexture = (text: string, subtext: string, colorHex: string): THREE.Texture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 140;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.Texture();
+
+  ctx.fillStyle = 'rgba(6, 10, 22, 0.96)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = colorHex;
+  ctx.lineWidth = 5;
+  ctx.shadowColor = colorHex;
+  ctx.shadowBlur = 14;
+  ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+
+  // Corner brackets
+  ctx.fillStyle = colorHex;
+  ctx.fillRect(2, 2, 20, 5);
+  ctx.fillRect(2, 2, 5, 20);
+  ctx.fillRect(canvas.width - 22, 2, 20, 5);
+  ctx.fillRect(canvas.width - 7, 2, 5, 20);
+  ctx.fillRect(2, canvas.height - 7, 20, 5);
+  ctx.fillRect(2, canvas.height - 22, 5, 20);
+  ctx.fillRect(canvas.width - 22, canvas.height - 7, 20, 5);
+  ctx.fillRect(canvas.width - 7, canvas.height - 22, 5, 20);
+
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = colorHex;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 32px "Courier New", monospace, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, canvas.width / 2, 58);
+
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = colorHex;
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText(subtext, canvas.width / 2, 102);
+
+  return new THREE.CanvasTexture(canvas);
+};
+
+const createBillboardMesh = (width: number, height: number, text: string, subtext: string, colorHex: string): THREE.Mesh => {
+  const geo = new THREE.PlaneGeometry(width, height);
+  const tex = createCyberSignTexture(text, subtext, colorHex);
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+  return new THREE.Mesh(geo, mat);
+};
+
+// --- Main AutonomousBlog Application ---
 const AutonomousBlog = () => {
-  const [selectedDestination, setSelectedDestination] = useState<any>(DESTINATIONS[0]);
-  const [selectedBlogPost, setSelectedBlogPost] = useState<any>(null);
+  const [selectedDestination, setSelectedDestination] = useState<DestinationItem | null>(DESTINATIONS[0]);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const isNavigatingRef = useRef(false);
   const [navigationProgress, setNavigationProgress] = useState(0);
+  const [viewMode, setViewMode] = useState<'topDown' | 'follow' | 'hero'>('topDown');
+  const [currentPosition, setCurrentPosition] = useState<DestinationItem>(DESTINATIONS[0]);
+
   const [currentRoute, setCurrentRoute] = useState<{
     path: Waypoint[];
-    destination: any | null;
+    destination: DestinationItem | null;
   }>({
     path: [],
     destination: null
@@ -263,591 +610,78 @@ const AutonomousBlog = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const isResettingCameraRef = useRef<boolean>(false);
-  const buildingsRef = useRef<THREE.Group[]>([]);
+  const targetCamPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 240, 25));
+  const targetLookAtRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
 
-  const [currentPosition, setCurrentPosition] = useState(DESTINATIONS[0]);
+  const animatedPropsRef = useRef<{
+    v2xRings: THREE.Mesh[];
+    radarDishes: (THREE.Mesh | THREE.Group)[];
+    holoOrb: THREE.Mesh | null;
+    blinkingLights: THREE.Mesh[];
+    lidarPuck: THREE.Mesh | null;
+  }>({
+    v2xRings: [],
+    radarDishes: [],
+    holoOrb: null,
+    blinkingLights: [],
+    lidarPuck: null,
+  });
 
-  const blogPosts = [
-  {
-    id: 1,
-    title: "How LiDARs Really Work (and Why They Don't Shoot Lasers at Your Face)",
-    date: "December 2024",
-    preview: "A fun, slightly dramatic deep dive into the sensors that help cars 'see' — minus the sci-fi laser battles Hollywood promised us.",
-    content: (
-      <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 text-lg leading-relaxed mb-4">
-          If you've ever wondered how self-driving cars "see" the world around them, the answer is probably sitting 
-          on top of the vehicle, spinning quietly like a tiny disco ball. That's LiDAR — Light Detection and Ranging — 
-          and it's basically giving the car superpowers.
-        </p>
-        
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">What Even Is LiDAR?</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          LiDAR works by shooting out laser pulses — millions of them per second — and measuring how long it takes 
-          for each pulse to bounce back. It's like echolocation for bats, except with light instead of sound. 
-          Each returning pulse tells the sensor exactly how far away an object is, down to the centimeter.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          The result? A detailed 3D point cloud of everything around the vehicle: pedestrians, other cars, trees, 
-          road signs, that random shopping cart someone left in the parking lot. It updates in real-time, giving 
-          the car a constantly refreshed map of its surroundings.
-        </p>
+  const cityPlots = useRef<LandPlot[]>(generateLandPlots());
 
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">But Wait, Isn't a Laser Dangerous?</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Great question. And the answer is: not really. Automotive LiDAR uses infrared light at wavelengths 
-          around 905nm or 1550nm, which are classified as Class 1 lasers. That's the same safety rating as your 
-          TV remote or a barcode scanner at the grocery store.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          The power is distributed across a wide field of view, and the pulses are incredibly brief. So no, 
-          the self-driving car rolling past you isn't going to accidentally laser your retina. Hollywood lied 
-          to us (again).
-        </p>
+  useEffect(() => {
+    isNavigatingRef.current = isNavigating;
+  }, [isNavigating]);
 
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Why Not Just Use Cameras?</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Cameras are great — they're cheap, high-resolution, and can read street signs. But they struggle in 
-          low light, get confused by shadows, and can't directly measure distance. A white car in front of a 
-          white wall? Good luck with that.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          LiDAR doesn't care about lighting conditions. Rain? Works. Fog? Mostly works. Complete darkness? 
-          Still works. It gives you direct, precise depth information without having to infer it from pixels.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Real Challenge: Processing All That Data</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Here's the thing people don't talk about enough: a single LiDAR can generate millions of points per 
-          second. That's a massive amount of data. You need to filter out noise (reflections from rain, dust, 
-          insects), cluster points into objects, track those objects over time, and predict where they're going 
-          — all in real-time, because the car is moving at 60 mph and needs to make decisions <em>now</em>.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This is where sensor fusion comes in. LiDAR gives you the geometry, cameras give you texture and 
-          semantics (like reading traffic lights), and radar gives you velocity. Combine all three, and you've 
-          got a pretty solid understanding of the world.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Future of LiDAR</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Early LiDAR units cost $75,000 and looked like giant rotating buckets. Now? You can get solid-state 
-          LiDAR for under $1,000, and they're getting smaller, cheaper, and more capable every year.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Some companies (looking at you, Tesla) are betting that cameras alone can solve autonomous driving. 
-          Others think LiDAR is essential. Personally? I think the debate misses the point. It's not about which 
-          sensor is "better" — it's about building systems that are redundant, robust, and safe. And right now, 
-          LiDAR is one of the best tools we have for that.
-        </p>
-        <p className="text-gray-300 leading-relaxed">
-          So next time you see a self-driving car with that spinning sensor on top, give it a little nod of 
-          respect. It's working hard to not run you over.
-        </p>
-      </div>
-    )
-  },
-  {
-    id: 2,
-    title: "Why Sensor Fusion is Harder Than It Sounds",
-    date: "November 2024",
-    preview: "Combining camera, radar, and LiDAR data sounds simple in theory. In practice, it's like conducting an orchestra where every instrument is playing a different song.",
-    content: (
-      <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 text-lg leading-relaxed mb-4">
-          Sensor fusion is one of those terms that sounds straightforward: you have multiple sensors, you combine 
-          their data, and boom — you get a better understanding of the world. Except in reality, it's more like 
-          trying to merge three different languages, spoken at different speeds, with different levels of accuracy, 
-          all while driving at highway speeds.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Coordinate System Problem</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Let's start with the basics. Every sensor on a vehicle has its own coordinate system. The camera sees 
-          the world in pixels. LiDAR measures distances in 3D space. Radar gives you range and velocity in polar 
-          coordinates. Before you can fuse anything, you need to transform all of this data into a common reference 
-          frame.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This is called extrinsic calibration, and it needs to be <em>precise</em>. We're talking millimeter-level 
-          accuracy. If your LiDAR is off by just a few degrees, that pedestrian at 50 meters suddenly appears to be 
-          standing in the middle of the road instead of on the sidewalk. And now your car is slamming on the brakes 
-          for no reason.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Oh, and this calibration? It can drift over time due to vibrations, temperature changes, or just normal 
-          wear and tear. So you need mechanisms to detect and correct for miscalibration automatically. Fun times.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Timing is Everything</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Here's another problem: your sensors don't all run at the same frequency. Your camera might capture frames 
-          at 30 Hz. Your LiDAR spins at 10 Hz. Your radar updates at 20 Hz. And your GPS? That's refreshing at 
-          1-10 Hz depending on the unit.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Why does this matter? Because a car moving at 60 mph (about 27 m/s) covers almost 3 meters in just 100 
-          milliseconds. If your sensors are out of sync by even that small amount, you're fusing stale data — trying 
-          to combine a LiDAR measurement from 100ms ago with a camera frame from right now. The car you detected? 
-          It's not actually where you think it is anymore.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          The solution is temporal alignment: you need to interpolate or extrapolate sensor data to a common 
-          timestamp. But interpolation introduces uncertainty. And extrapolation? That's just guessing with 
-          extra steps.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Association Problem</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Now let's say you've got everything calibrated and time-synced. Great! But here's the next challenge: 
-          how do you know that the object detected by the camera is the same object detected by the LiDAR?
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This is called the data association problem, and it's harder than it sounds. The camera might see a car 
-          and a pedestrian. The LiDAR might see three distinct clusters of points. The radar might detect two moving 
-          targets. Which detection corresponds to which?
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          You can use algorithms like the Hungarian algorithm or Joint Probabilistic Data Association (JPDA) to 
-          solve this, but they're computationally expensive. And if you get it wrong? Congrats, you just fused a 
-          pedestrian with a lamppost, and now your perception stack thinks there's a 7-foot-tall object that's both 
-          stationary and moving at the same time.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Conflicting Information</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Even when everything is aligned and associated correctly, sensors can disagree. The camera says there's 
-          a car 20 meters ahead. The LiDAR says 21 meters. The radar says 19.5 meters. Which one is right?
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This is where you need robust fusion algorithms — typically Kalman filters or particle filters — that 
-          can weigh the reliability of each sensor and produce a fused estimate. But these filters need to know 
-          how much to trust each sensor, which depends on environmental conditions. LiDAR is great in clear weather 
-          but struggles in heavy rain. Cameras are useless at night without good lighting. Radar is consistent but 
-          has low resolution.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          So now you need adaptive fusion: dynamically adjusting trust levels based on context. And that's a whole 
-          other research problem.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Computational Constraints</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Oh, and did I mention you have to do all of this in real-time, on embedded hardware, with limited power 
-          and cooling? A typical autonomous vehicle might process gigabytes of sensor data per second. You can't 
-          just throw a server rack in the trunk.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This means optimizing algorithms, parallelizing computations, and making hard trade-offs between accuracy 
-          and latency. Sometimes "good enough" in 50 milliseconds is better than "perfect" in 200 milliseconds — 
-          because by the time you finish computing, the world has already changed.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">So Why Bother?</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Because when done right, sensor fusion is <em>incredible</em>. You get the best of all worlds: the 
-          resolution of cameras, the precision of LiDAR, and the velocity measurements of radar. You get redundancy, 
-          so if one sensor fails, the others can compensate. You get robustness across different weather conditions 
-          and lighting scenarios.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          It's hard. Really hard. But it's also one of the most important problems in autonomous driving. Because 
-          at the end of the day, fusing sensors isn't just about making better maps or tracking objects more 
-          accurately. It's about building systems that are safe enough to trust with human lives.
-        </p>
-        <p className="text-gray-300 leading-relaxed">
-          And that's worth the effort.
-        </p>
-      </div>
-    )
-  },
-  {
-    id: 3,
-    title: "Hacking a Self-Driving Car with a Post-it Note",
-    date: "January 2025",
-    preview: "Adversarial attacks are the optical illusions of the AI world. Here is how a piece of tape can turn a Stop sign into a Speed Limit sign.",
-    content: (
-      <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 text-lg leading-relaxed mb-4">
-          Imagine you are a state-of-the-art Deep Learning model. You have been trained on millions of images. 
-          You can spot a pedestrian in a blizzard. You can distinguish a Chihuahua from a blueberry muffin. 
-          But then, someone puts a small, specifically patterned sticker on a Stop sign.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          To a human, it’s just a vandalized Stop sign. But to the model's internal mathematical representation, 
-          that sticker shifts the probability distribution just enough to flip the final classification. 
-          It is now confidentially a "Speed Limit 45" sign. Welcome to the terrifying world of <strong>Adversarial Attacks</strong>.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">It's Not Magic, It's Math</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Neural networks work by finding complex patterns in pixel data (edges, textures, shapes). Adversarial attacks exploit this by introducing 
-          perturbations—tiny changes to pixels that are often invisible to the human eye but push the image across a 
-          decision boundary in the model's high-dimensional space.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          To understand <em>how</em> this happens, you have to look at the "Gradient." When we train an AI, we use the gradient to minimize error—essentially 
-          telling the model, "Change your parameters this way to get the right answer."
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          An attack works in reverse. The attacker asks the model, "How do I change this image's pixels to <strong>maximize</strong> the error?" 
-          The model's own math reveals the exact weak spots. The attacker then nudges the pixels in that specific direction. 
-          It is jujitsu for algorithms; using the model's own force against it.
-        </p>
-         
-        {/* --- IMAGE START --- */}
-        <figure className="float-right ml-6 mb-4 w-64">
-          <img 
-            src={mcAfeeImage} 
-            alt="McAfee research showing a 35 mph sign modified with tape to look like 85 mph to a computer vision system"
-            className="w-full rounded-lg shadow-lg border border-gray-700"
-          />
-          <figcaption className="text-center text-gray-400 text-sm mt-2">
-            Source: McAfee ATR. The Mobileye camera read this modified sign as "85 MPH".
-          </figcaption>
-        </figure>
-         {/* --- IMAGE END --- */}
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The McAfee "Speed Limit" Hack</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Digital attacks are one thing, but physical attacks are scarier. In a famous study, researchers from McAfee ATR managed to fool a 
-          Tesla Model S (specifically the Mobileye EyeQ3 camera system) into accelerating autonomously.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          They didn't hack the software. They simply went to a hardware store. By placing a 2-inch strip of black electrical tape 
-          horizontally across the middle of the "3" on a "35 MPH" sign, they slightly elongated the center line. 
-          To a human, it still clearly looked like a 3. But to the computer vision algorithm, the specific arrangement of edges and contrast 
-          perfectly matched the statistical features of an "8".
-        </p>
-
-        <p className="text-gray-300 leading-relaxed mb-4">
-          The car read the sign as "85 MPH" and the Traffic Aware Cruise Control (TACC) automatically accelerated the vehicle towards that speed. 
-          This proves that you don't need a supercomputer to crash a car; you just need to understand how the vision sensor extracts features.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Invisibility Cloak</h3>
-        {/* --- IMAGE START --- */}
-        <figure className="float-right ml-6 mb-4 w-64">
-          <img 
-            src={thysRanst} 
-            alt="An adversarial patch that is successfully able to hide persons from a person detector. Left: The person without a patch is successfully detected. Right: The person holding the patch is ignored."
-            className="w-full rounded-lg shadow-lg border border-gray-700"
-          />
-          <figcaption className="text-center text-gray-400 text-sm mt-2">
-            Source: Fooling automated surveillance cameras: adversarial patches to attack person detection.
-          </figcaption>
-        </figure>
-         {/* --- IMAGE END --- */}
-        <p className="text-gray-300 leading-relaxed mb-4">
-          It isn't just about making a Stop sign look like a Speed Limit sign. Sometimes, the goal is to make things disappear entirely.
-          Researchers (Thys et al.) developed "adversarial patches"—trippy, psychedelic patterns that look like abstract art to us.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          These patches effectively hack object detectors like <strong>YOLO (You Only Look Once)</strong>. 
-          YOLO divides an image into a grid and assigns an "objectness" score to each section. The adversarial patch is optimized to 
-          crush this objectness score.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          When a person holds this printed patch over their stomach, the patch acts as a "salient" distractor. 
-          It overwhelms the neural network's activation map, causing the probability of the "Person" class to drop below the detection threshold. 
-          The bounding box simply vanishes. To the AI, the person has ceased to exist.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Do Hackers Need the Source Code?</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          You might think, "Well, my model is proprietary and hidden on a server, so I'm safe." Unfortunately, not quite.
-          Attacks are split into <strong>White Box</strong> (attacker has the model's code) and <strong>Black Box</strong> (attacker knows nothing).
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          In a Black Box attack, hackers can train their <em>own</em> substitute model to mimic yours, generate attacks against their substitute, 
-          and then use those same attacks on your model. Surprisingly, these attacks are often "transferable." 
-          An adversarial image that fools a Google model will often fool a Facebook model, because they both learn similar features about the world.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">How We Fix It</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          <strong>1. Adversarial Training:</strong> We essentially "vaccinate" the model by generating these attacks ourselves 
-          during the training phase and teaching the model to ignore them.
-          <br/><br/>
-          <strong>2. Sensor Redundancy:</strong> This is the big one. If the camera thinks the Stop sign is a Speed Limit sign, 
-          but the HD Map says "There is definitely a junction here," and the Lidar sees a wall, the car should be 
-          smart enough to prioritize safety over the camera's confusion.
-          <br/><br/>
-          <strong>3. Input Sanitization:</strong> Before the image even reaches the neural network, we can "wash" it. 
-          Techniques like JPEG compression or slight blurring can destroy the delicate high-frequency noise of an attack 
-          without hurting the overall image too much.
-          <br/><br/>
-          <strong>4. The Infinite Arms Race:</strong> The reality is that defense is harder than offense. 
-          Every time researchers invent a new defense, attackers find a way to bypass it. Security in AI isn't a destination; it’s a constant game of cat and mouse.
-        </p>
-      </div>
-    )
-  },
-  {
-    id: 4,
-    title: "NeRFs vs. Gaussian Splatting: The Battle for 3D Supremacy",
-    date: "February 2025",
-    preview: "Why represent a 3D world with a neural network when you can just throw millions of glowing 3D blobs at the screen?",
-    content: (
-      <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 text-lg leading-relaxed mb-8">
-          For a few years, <strong>NeRFs (Neural Radiance Fields)</strong> were the undisputed kings of 3D reconstruction. 
-          They used neural networks to "imagine" what an object looked like from any angle. The results were photorealistic, 
-          but rendering them was painfully slow.
-        </p>
-        <p className="text-gray-300 text-lg leading-relaxed mb-12">
-          Enter <strong>3D Gaussian Splatting (3DGS)</strong>. It dropped in 2023, and it essentially said: "Forget the neural network. 
-          Let's just use millions of 3D ellipsoids." But before we choose a winner, we need to understand the battlefield.
-        </p>
-    
-        {/* ================================================================================== */}
-        {/* PART 1: THE BASICS - HOW 3D WORKS */}
-        {/* ================================================================================== */}
-        
-        <div className="border-l-4 border-blue-500 pl-6 my-10 bg-gray-900/50 py-4 rounded-r-lg">
-          <h2 className="text-2xl font-bold text-white mb-4">Part 1: The Basics (Computer Vision 101)</h2>
-          <p className="text-gray-300 mb-4">
-              Before we talk about AI, we have to solve a physics problem: <strong>How do we get 3D depth from flat 2D images?</strong>
-          </p>
-        </div>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">1. The Pinhole Camera Model</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Every photo you take is a squashed version of reality. A 3D world (X, Y, Z) is projected onto a 2D plane (u, v pixels).
-          To reverse this, we need to know two things about the camera that took the photo:
-        </p>
-        <ul className="list-disc list-inside text-gray-300 mb-6 ml-4 space-y-2">
-          <li><strong>Extrinsics (Where was the camera?):</strong> The Position (X,Y,Z) and Rotation of the camera in the world.</li>
-          <li><strong>Intrinsics (How does the lens work?):</strong> The Focal Length and Principal Point. This tells us how "zoomed in" the image is.</li>
-        </ul>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">2. Structure from Motion (SfM) & COLMAP</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This is Step Zero for both NeRFs and Gaussian Splats. We feed 50-100 images into a tool called <strong>COLMAP</strong>.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          COLMAP uses algorithms like SIFT (Scale-Invariant Feature Transform) to find "key points"—distinctive corners, edges, or textures 
-          that appear in multiple photos. If it sees the same "corner of a table" in Image A and Image B, it can draw a line from both cameras. 
-          <strong>Where those lines intersect in 3D space is the point's location.</strong>
-        </p>
-        
-        <p className="text-gray-300 leading-relaxed mb-8">
-          This process creates a <strong>"Sparse Point Cloud"</strong>—a ghostly cloud of floating dots that roughly outlines the scene. 
-          This is our starting point.
-        </p>
-    
-        {/* ================================================================================== */}
-        {/* PART 2: THE NERF ERA */}
-        {/* ================================================================================== */}
-    
-        <div className="border-l-4 border-purple-500 pl-6 my-10 bg-gray-900/50 py-4 rounded-r-lg">
-          <h2 className="text-2xl font-bold text-white mb-4">Part 2: The NeRF Era (Implicit Representation)</h2>
-        </div>
-    
-        <p className="text-gray-300 leading-relaxed mb-4">
-          NeRFs look at that Sparse Point Cloud and say, "That's not enough detail." But instead of storing more points, NeRFs store the scene 
-          inside a function.
-        </p>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">The "Black Box" Approach</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          A NeRF is a <strong>Multi-Layer Perceptron (MLP)</strong>—a tiny neural network. You give it a coordinate (X, Y, Z) and a viewing direction, 
-          and it outputs a Color (RGB) and a Density (Sigma).
-          <br/>
-          <em>Input: (x, y, z, theta, phi) → Network → Output: (R, G, B, Opacity)</em>
-        </p>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">Why is it so slow? (Ray Marching)</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          To render a <strong>single pixel</strong> on your screen, the NeRF engine has to shoot a ray through that pixel into the 3D void. 
-          Because it doesn't know where objects are, it has to "march" along that ray, stopping every few millimeters to ask the neural network: 
-          "Is there anything here?"
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-8">
-          It does this hundreds of times <em>per ray</em>. For a 1080p image (2 million pixels), that is billions of network queries per frame. 
-          That is why NeRFs run at 0.5 FPS.
-        </p>
-    
-        {/* ================================================================================== */}
-        {/* PART 3: THE SPLATTING REVOLUTION */}
-        {/* ================================================================================== */}
-    
-        <div className="border-l-4 border-green-500 pl-6 my-10 bg-gray-900/50 py-4 rounded-r-lg">
-          <h2 className="text-2xl font-bold text-white mb-4">Part 3: Gaussian Splatting (Explicit Representation)</h2>
-        </div>
-    
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Gaussian Splatting is a return to "Explicit" geometry. It doesn't use a neural network to render. It uses a list of blobs.
-        </p>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">The Anatomy of a Splat</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Instead of triangles (like in video games), we use <strong>3D Gaussians</strong> (ellipsoids). 
-          The system initializes one Gaussian at every point in the COLMAP sparse cloud. Each Gaussian carries these parameters:
-        </p>
-        <ul className="list-disc list-inside text-gray-300 mb-6 ml-4 space-y-2">
-          <li><strong>Position (Mean):</strong> XYZ center.</li>
-          <li><strong>Covariance Matrix:</strong> A 3x3 matrix that defines the shape. Is it a long thin cigar? A flat pancake? A perfect sphere?</li>
-          <li><strong>Alpha:</strong> How transparent it is.</li>
-          <li><strong>Spherical Harmonics (SH):</strong> This is the magic. It stores 16+ numbers that define how the color changes depending on the viewing angle (simulating gloss/reflections).</li>
-        </ul>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">How It Learns: Adaptive Density Control</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          This is the most brilliant part of the algorithm. We start with a sparse, hole-filled cloud. We need to fill it in.
-          We perform <strong>Gradient Descent</strong> comparing the rendered image to the real photo.
-        </p>
-        <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h4 className="font-bold text-blue-400 mb-2">The "Clone vs. Split" Logic:</h4>
-          <ul className="list-disc list-inside text-gray-300 space-y-2">
-            <li><strong>Under-Reconstruction:</strong> If an area is too blurry but the Gaussian is small, the system <strong>CLONES</strong> it (makes a copy) and moves it slightly to fill the gap.</li>
-            <li><strong>Over-Reconstruction:</strong> If a Gaussian is huge and trying to cover too much detail (high variance), the system <strong>SPLITS</strong> it into two smaller Gaussians to capture finer detail.</li>
-            <li><strong>Pruning:</strong> If a Gaussian becomes virtually invisible (Alpha &lt; 0.005), it is deleted to save memory.</li>
-          </ul>
-        </div>
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">The Speed Secret: Tile-Based Rasterization</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          NeRFs are slow because of Ray Marching. Gaussian Splatting is fast because of <strong>Rasterization</strong>.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          1. <strong>Projection:</strong> The 3D ellipsoids are mathematically projected onto the 2D camera plane.
-          <br/>
-          2. <strong>Sorting:</strong> The system uses a super-fast GPU Radix Sort to order the splats from front-to-back.
-          <br/>
-          3. <strong>Tiling:</strong> The screen is divided into 16x16 pixel tiles. Each tile only processes the splats that touch it.
-          <br/>
-          4. <strong>Alpha Blending:</strong> The colors are accumulated until the opacity reaches 100%.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-8">
-          This pipeline avoids querying a neural network entirely. It’s pure matrix math, which GPUs eat for breakfast. 
-          This is how we get <strong>100+ FPS</strong>.
-        </p>
-    
-        {/* ================================================================================== */}
-        {/* CONCLUSION */}
-        {/* ================================================================================== */}
-    
-        <h3 className="text-xl font-bold text-white mt-8 mb-4">The Verdict</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          <strong>NeRFs</strong> are perfect if you have tiny storage limits (MBs) and don't care about render time.
-          <br/>
-          <strong>Gaussian Splats</strong> are the future for real-time applications (VR, AR, Autonomous Driving sims). 
-          The files are larger (GBs), but the ability to render photorealism at 120 FPS is a game-changer we haven't seen in decades.
-        </p>
-      </div>
-    )
-  },
-  {
-    id: 5,
-    title: "The Matrix for Cars: Why Simulation is King",
-    date: "March 2025",
-    preview: "You can't drive a real car off a cliff a thousand times to see what happens. But in a simulator? You can do it before breakfast.",
-    content: (
-      <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 text-lg leading-relaxed mb-4">
-          Waymo and Cruise have driven millions of miles in the real world. That sounds impressive, but in the grand scheme of 
-          statistics, it's nothing. To prove an autonomous vehicle is statistically safer than a human, you need billions of miles of validation.
-          Driving that physically would take centuries.
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          We can't wait 500 years. So, we enter the Matrix.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Long Tail Problem</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Driving on a sunny highway is easy. Driving when a mattress falls off the truck in front of you while it's hailing 
-          and a kangaroo jumps out? That's an "edge case."
-        </p>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          These edge cases are rare in real life (the "Long Tail" of data distributions), but they are where accidents happen. 
-          In a simulator (like CARLA or proprietary engines), we can script these scenarios. We can make it rain mattresses 
-          all day long until the AI learns how to dodge them.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">Sim-to-Real Gap</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          The challenge is the "Sim-to-Real gap." If the physics in the simulator aren't perfect, or the lighting looks slightly "video game-y," 
-          the AI might overfit to the simulation. It learns to play the game, not drive the car.
-          This leads to the comical situation of an AI being a perfect driver in the simulator but crashing instantly in the real world because 
-          shadows look different.
-        </p>
-
-        <h3 className="text-xl font-bold text-white mt-6 mb-3">The Data Flywheel</h3>
-        <p className="text-gray-300 leading-relaxed mb-4">
-          Modern development works in a loop:
-        </p>
-        <div className="bg-slate-900 p-4 rounded-lg border border-slate-700 font-mono text-sm text-blue-300 mb-4">
-           Real cars collect data &rarr; We build a sim from that data &rarr; We train the AI in the sim &rarr; We deploy better AI to real cars.
-        </div>
-        <p className="text-gray-300 leading-relaxed">
-          This is known as <strong>Re-Simulation</strong>. We take a real log where the car made a mistake, 
-          turn it into a simulation, and then run it thousands of times with slight variations (different weather, slightly different timing) 
-          to ensure the new code actually fixed the problem.
-        </p>
-      </div>
-    )
-  }
-];
-
-  // --- Three.js Setup ---
+  // --- Three.js Setup & World Generation ---
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    animatedPropsRef.current = {
+      v2xRings: [],
+      radarDishes: [],
+      holoOrb: null,
+      blinkingLights: [],
+      lidarPuck: null,
+    };
+
     const scene = new THREE.Scene();
-    // Soft distant fog: doesn't wash out foreground buildings
-    scene.fog = new THREE.Fog(0x0a0a15, 120, 450);
+    scene.fog = new THREE.Fog(0x050811, 160, 480);
     sceneRef.current = scene;
 
     const container = canvasRef.current.parentElement;
     const initialWidth = container ? container.clientWidth : 800;
     const initialHeight = container ? container.clientHeight : 800;
 
-    // FOV 50 gives a cinematic, comfortable perspective with generous vertical headroom
-    const camera = new THREE.PerspectiveCamera(50, initialWidth / initialHeight, 0.1, 800);
-    // Courtyard elevated vantage point looking at Home Base
-    camera.position.set(0, 48, -21);
-    camera.lookAt(0, 2, -60);
+    // Camera starts in TOP-DOWN bird's eye view showing the full city map
+    const camera = new THREE.PerspectiveCamera(50, initialWidth / initialHeight, 0.1, 1000);
+    camera.position.set(0, 240, 25);
+    camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ 
       canvas: canvasRef.current, 
       antialias: true,
-      alpha: false,
       powerPreference: "high-performance"
     });
     renderer.setSize(initialWidth, initialHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.setClearColor(0x0a0a15, 1);
+    renderer.setClearColor(0x050811, 1);
 
-    // OrbitControls for interactive 3D navigation
+    // OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 2, -60);
+    controls.target.set(0, 0, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.enablePan = false;
     controls.minDistance = 15;
-    controls.maxDistance = 160;
-    controls.minPolarAngle = 0.15;
-    controls.maxPolarAngle = Math.PI / 2 - 0.05;
-    controls.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.ROTATE,
-    };
-    controls.touches = {
-      ONE: THREE.TOUCH.ROTATE,
-      TWO: THREE.TOUCH.DOLLY_PAN,
-    };
-    controls.addEventListener('start', () => {
-      isResettingCameraRef.current = false;
-    });
+    controls.maxDistance = 350;
+    controls.maxPolarAngle = Math.PI / 2 - 0.04;
     controls.update();
     controlsRef.current = controls;
 
-    // Responsive Resize Observer
+    // Window resize observer
     const handleResize = () => {
       if (!container || !cameraRef.current) return;
       const w = container.clientWidth;
@@ -858,131 +692,122 @@ const AutonomousBlog = () => {
       renderer.setSize(w, h);
     };
     const resizeObserver = new ResizeObserver(handleResize);
-    if (container) {
-      resizeObserver.observe(container);
-    }
+    if (container) resizeObserver.observe(container);
 
-    const ambientLight = new THREE.AmbientLight(0x505070, 0.6);
+    // --- Cyberpunk Lighting ---
+    const ambientLight = new THREE.AmbientLight(0x0f172a, 0.9);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x1a2035, 0.7);
-    hemiLight.position.set(0, 100, 0);
+    const hemiLight = new THREE.HemisphereLight(0x00ff66, 0x1e1b4b, 0.4);
+    hemiLight.position.set(0, 150, 0);
     scene.add(hemiLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    directionalLight.position.set(50, 90, 50);
+    const directionalLight = new THREE.DirectionalLight(0x67e8f9, 1.2);
+    directionalLight.position.set(80, 140, 60);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.camera.left = -100;
-    directionalLight.shadow.camera.right = 100;
-    directionalLight.shadow.camera.top = 100;
-    directionalLight.shadow.camera.bottom = -100;
+    directionalLight.shadow.camera.far = 600;
+    directionalLight.shadow.camera.left = -180;
+    directionalLight.shadow.camera.right = 180;
+    directionalLight.shadow.camera.top = 180;
+    directionalLight.shadow.camera.bottom = -180;
     scene.add(directionalLight);
 
-    // Ground
-    const groundGeometry = new THREE.PlaneGeometry(600, 600);
+    // --- Ground Grid Floor ---
+    const groundGeometry = new THREE.PlaneGeometry(800, 800);
     const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x0f1419,
-      roughness: 0.95,
-      metalness: 0.05
+      color: 0x04060d,
+      roughness: 0.5,
+      metalness: 0.4
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const gridHelper = new THREE.GridHelper(600, 120, 0x1a4d6f, 0x0d2433);
+    const gridHelper = new THREE.GridHelper(800, 160, 0x00ff66, 0x0b1726);
     gridHelper.position.y = 0.01;
+    const gridMat = gridHelper.material as THREE.Material;
+    if (gridMat) {
+      gridMat.transparent = true;
+      gridMat.opacity = 0.18;
+    }
     scene.add(gridHelper);
 
-    // --- Roads Setup with Curved Corner Meshes ---
-    const roadWidth = 8;
-    const cornerRadius = 8;
-    const halfWidth = roadWidth / 2; // 4
-    const innerRadius = cornerRadius - halfWidth; // 4
-    const outerRadius = cornerRadius + halfWidth; // 12
-    const cornerCenterOffset = 52;
-
-    const textureLoader = new THREE.TextureLoader();
-    const roadTexture = textureLoader.load('/assets/road_straight.png');
-    roadTexture.wrapS = THREE.RepeatWrapping;
-    roadTexture.wrapT = THREE.RepeatWrapping;
-    
+    // --- Road Network Construction (Matching Picture 2) ---
+    const roadTexture = createCyberRoadTexture();
     const roadMaterial = new THREE.MeshStandardMaterial({ 
       map: roadTexture,
-      roughness: 0.9,
+      roughness: 0.6,
+      metalness: 0.3,
       side: THREE.DoubleSide
     });
 
-    // 4 Straight road segments
-    const straightRoads = [
-      // North side (z = -60)
-      { from: { x: -cornerCenterOffset, z: -60 }, to: { x: cornerCenterOffset, z: -60 } },
-      // East side (x = 60)
-      { from: { x: 60, z: -cornerCenterOffset }, to: { x: 60, z: cornerCenterOffset } },
-      // South side (z = 60)
-      { from: { x: cornerCenterOffset, z: 60 }, to: { x: -cornerCenterOffset, z: 60 } },
-      // West side (x = -60)
-      { from: { x: -60, z: cornerCenterOffset }, to: { x: -60, z: -cornerCenterOffset } },
-    ];
-
-    straightRoads.forEach(road => {
-      const dx = road.to.x - road.from.x;
-      const dz = road.to.z - road.from.z;
-      const length = Math.sqrt(dx * dx + dz * dz);
+    const createRoadMesh = (x1: number, z1: number, x2: number, z2: number, width: number = 8) => {
+      const dx = x2 - x1;
+      const dz = z2 - z1;
+      const len = Math.hypot(dx, dz);
       const angle = Math.atan2(dx, dz);
 
-      const repeatY = length / roadWidth;
-      const geometry = new THREE.PlaneGeometry(roadWidth, length);
-      const material = roadMaterial.clone();
-      material.map = roadTexture.clone();
-      material.map.repeat.set(1, repeatY);
-      material.map.needsUpdate = true;
+      const geo = new THREE.PlaneGeometry(width, len);
+      const mat = roadMaterial.clone();
+      mat.map = roadTexture.clone();
+      mat.map.repeat.set(1, len / width);
+      mat.map.needsUpdate = true;
 
-      const roadMesh = new THREE.Mesh(geometry, material);
-      roadMesh.rotation.x = -Math.PI / 2;
-      roadMesh.rotation.z = -angle;
-      roadMesh.position.set((road.from.x + road.to.x) / 2, 0.02, (road.from.z + road.to.z) / 2);
-      roadMesh.receiveShadow = true;
-      scene.add(roadMesh);
-    });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = -angle;
+      mesh.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    };
 
-    // 4 Corner Curve Meshes
+    // 1. Four Outer Avenues (Width 8, connecting the 4 hero destinations)
+    createRoadMesh(-130, -130, 130, -130, 8); // North Avenue
+    createRoadMesh(130, -130, 130, 130, 8);   // East Avenue
+    createRoadMesh(130, 130, -130, 130, 8);   // South Avenue
+    createRoadMesh(-130, 130, -130, -130, 8); // West Avenue
+
+    // 2. Central Boulevards
+    createRoadMesh(0, -130, 0, 130, 8);       // Central North-South Boulevard
+    createRoadMesh(-130, 0, 130, 0, 8);       // Central East-West Boulevard
+
+    // 3. Intermediate Secondary Streets (Creating Picture 2 Grid Partitioning)
+    createRoadMesh(-65, -130, -65, 130, 6);
+    createRoadMesh(65, -130, 65, 130, 6);
+    createRoadMesh(-130, -65, 130, -65, 6);
+    createRoadMesh(-130, 65, 130, 6, 6);
+
+    // 4. Perimeter Highway Rounded Corner Arcs
     const cornerConfigs = [
-      // Bottom-Right Corner (Connecting x=60, z=52 to x=52, z=60)
-      { cx: cornerCenterOffset, cz: cornerCenterOffset, startAngle: 0, endAngle: Math.PI / 2 },
-      // Bottom-Left Corner (Connecting x=-52, z=60 to x=-60, z=52)
-      { cx: -cornerCenterOffset, cz: cornerCenterOffset, startAngle: Math.PI / 2, endAngle: Math.PI },
-      // Top-Left Corner (Connecting x=-60, z=-52 to x=-52, z=-60)
-      { cx: -cornerCenterOffset, cz: -cornerCenterOffset, startAngle: Math.PI, endAngle: 3 * Math.PI / 2 },
-      // Top-Right Corner (Connecting x=52, z=-60 to x=60, z=-52)
-      { cx: cornerCenterOffset, cz: -cornerCenterOffset, startAngle: 3 * Math.PI / 2, endAngle: 2 * Math.PI },
+      { cx: CORNER_OFFSET, cz: -CORNER_OFFSET, start: -Math.PI / 2, end: 0 },
+      { cx: CORNER_OFFSET, cz: CORNER_OFFSET, start: 0, end: Math.PI / 2 },
+      { cx: -CORNER_OFFSET, cz: CORNER_OFFSET, start: Math.PI / 2, end: Math.PI },
+      { cx: -CORNER_OFFSET, cz: -CORNER_OFFSET, start: Math.PI, end: 3 * Math.PI / 2 },
     ];
 
     cornerConfigs.forEach(cfg => {
-      const segments = 32;
-      const geometry = new THREE.BufferGeometry();
+      const segments = 24;
+      const geo = new THREE.BufferGeometry();
       const vertices: number[] = [];
       const uvs: number[] = [];
       const indices: number[] = [];
-
-      const arcLen = cornerRadius * Math.abs(cfg.endAngle - cfg.startAngle);
-      const repeatV = arcLen / roadWidth;
+      const rInner = CORNER_R - 4;
+      const rOuter = CORNER_R + 4;
 
       for (let i = 0; i <= segments; i++) {
         const t = i / segments;
-        const angle = cfg.startAngle + t * (cfg.endAngle - cfg.startAngle);
+        const angle = cfg.start + t * (cfg.end - cfg.start);
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
 
-        vertices.push(cfg.cx + innerRadius * cos, 0.02, cfg.cz + innerRadius * sin);
-        vertices.push(cfg.cx + outerRadius * cos, 0.02, cfg.cz + outerRadius * sin);
-
-        uvs.push(0, t * repeatV);
-        uvs.push(1, t * repeatV);
+        vertices.push(cfg.cx + rInner * cos, 0.022, cfg.cz + rInner * sin);
+        vertices.push(cfg.cx + rOuter * cos, 0.022, cfg.cz + rOuter * sin);
+        uvs.push(0, t * 2);
+        uvs.push(1, t * 2);
       }
 
       for (let i = 0; i < segments; i++) {
@@ -990,202 +815,725 @@ const AutonomousBlog = () => {
         const i2 = i * 2 + 1;
         const i3 = (i + 1) * 2;
         const i4 = (i + 1) * 2 + 1;
-
         indices.push(i1, i2, i3);
         indices.push(i2, i4, i3);
       }
 
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-      geometry.setIndex(indices);
-      geometry.computeVertexNormals();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
 
-      const cornerMat = roadMaterial.clone();
-      cornerMat.map = roadTexture.clone();
-      cornerMat.map.wrapS = THREE.RepeatWrapping;
-      cornerMat.map.wrapT = THREE.RepeatWrapping;
-      cornerMat.map.repeat.set(1, 1);
-      cornerMat.map.needsUpdate = true;
-
-      const cornerMesh = new THREE.Mesh(geometry, cornerMat);
+      const cornerMesh = new THREE.Mesh(geo, roadMaterial);
       cornerMesh.receiveShadow = true;
       scene.add(cornerMesh);
     });
 
-    // 4 Roadside Destinations (Buildings, Sidewalks, Windows, Stop Markings)
+    // --- Plots of Land & Green Outlines (Picture 2 Cadastral Style) ---
+    const plotBorderMat = new THREE.LineBasicMaterial({ color: 0x00ff66, linewidth: 2 });
+    const parkBorderMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 });
+
+    const sharedDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x060914,
+      roughness: 0.85,
+      metalness: 0.2
+    });
+
+    const sharedWireframeGreenMat = new THREE.LineBasicMaterial({
+      color: 0x00ff66,
+      linewidth: 1.5
+    });
+
+    const neonAccentMats = {
+      cyan: new THREE.MeshBasicMaterial({ color: 0x00f0ff }),
+      yellow: new THREE.MeshBasicMaterial({ color: 0xf59e0b }),
+      magenta: new THREE.MeshBasicMaterial({ color: 0xec4899 }),
+      green: new THREE.MeshBasicMaterial({ color: 0x10b981 }),
+    };
+
+    // Helper: Add wireframe edges to a mesh
+    const addWireframeEdges = (mesh: THREE.Mesh, parentGroup: THREE.Group, colorHex: number = 0x00ff66) => {
+      const edges = new THREE.EdgesGeometry(mesh.geometry, 24);
+      const line = new THREE.LineSegments(
+        edges, 
+        colorHex === 0x00ff66 ? sharedWireframeGreenMat : new THREE.LineBasicMaterial({ color: colorHex })
+      );
+      line.position.copy(mesh.position);
+      line.rotation.copy(mesh.rotation);
+      line.scale.copy(mesh.scale);
+      parentGroup.add(line);
+    };
+
+    // Build the Plots and populate them with Trees / Wireframe Buildings
+    cityPlots.current.forEach((plot) => {
+      const width = plot.maxX - plot.minX;
+      const depth = plot.maxZ - plot.minZ;
+      const cx = (plot.minX + plot.maxX) / 2;
+      const cz = (plot.minZ + plot.maxZ) / 2;
+
+      // 1. Plot Base Pad
+      const padGeo = new THREE.PlaneGeometry(width - 0.4, depth - 0.4);
+      const padMat = new THREE.MeshStandardMaterial({
+        color: plot.type === 'park' ? 0x031810 : 0x070b16,
+        roughness: 0.7,
+        metalness: 0.3
+      });
+      const padMesh = new THREE.Mesh(padGeo, padMat);
+      padMesh.rotation.x = -Math.PI / 2;
+      padMesh.position.set(cx, 0.025, cz);
+      padMesh.receiveShadow = true;
+      scene.add(padMesh);
+
+      // 2. Glowing Neon Boundary Outline (Picture 2 Look)
+      const borderPoints = [
+        new THREE.Vector3(plot.minX + 0.2, 0.05, plot.minZ + 0.2),
+        new THREE.Vector3(plot.maxX - 0.2, 0.05, plot.minZ + 0.2),
+        new THREE.Vector3(plot.maxX - 0.2, 0.05, plot.maxZ - 0.2),
+        new THREE.Vector3(plot.minX + 0.2, 0.05, plot.maxZ - 0.2),
+        new THREE.Vector3(plot.minX + 0.2, 0.05, plot.minZ + 0.2),
+      ];
+      const borderGeo = new THREE.BufferGeometry().setFromPoints(borderPoints);
+      const borderLine = new THREE.Line(borderGeo, plot.type === 'park' ? parkBorderMat : plotBorderMat);
+      scene.add(borderLine);
+
+      // 3. Fill the Plot based on its designation
+      if (plot.type === 'park') {
+        // --- Urban Park Plot filled with small wireframe trees (Picture 1 style) ---
+        const parkGroup = new THREE.Group();
+        parkGroup.position.set(cx, 0, cz);
+
+        const treeCount = Math.floor(Math.min(24, Math.max(14, (width * depth) / 100)));
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x09140f, roughness: 0.8 });
+        const crownFillMat = new THREE.MeshStandardMaterial({
+          color: 0x064e3b,
+          emissive: 0x047857,
+          emissiveIntensity: 0.35,
+          roughness: 0.3,
+          transparent: true,
+          opacity: 0.45,
+          flatShading: true
+        });
+
+        for (let t = 0; t < treeCount; t++) {
+          const tx = (Math.random() - 0.5) * (width - 8);
+          const tz = (Math.random() - 0.5) * (depth - 8);
+          const scale = 0.8 + Math.random() * 0.45;
+
+          const tree = new THREE.Group();
+          tree.position.set(tx, 0, tz);
+
+          // Slender trunk
+          const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * scale, 0.26 * scale, 2.2 * scale, 6), trunkMat);
+          trunk.position.y = 1.1 * scale;
+          tree.add(trunk);
+
+          // Faceted wireframe crown
+          const crownGeo = new THREE.IcosahedronGeometry(1.3 * scale, 0);
+          const crown = new THREE.Mesh(crownGeo, crownFillMat);
+          crown.position.y = 2.8 * scale;
+          tree.add(crown);
+          addWireframeEdges(crown, tree, 0x00ff66);
+
+          parkGroup.add(tree);
+        }
+        scene.add(parkGroup);
+
+      } else if (plot.type === 'cantilever') {
+        // --- Cantilever Skyscraper (Picture 1 Left Side Style) ---
+        const bGroup = new THREE.Group();
+        bGroup.position.set(cx, 0, cz);
+
+        const towerH = 48 + Math.random() * 12;
+        const mainW = Math.min(width * 0.45, 14);
+        const mainD = Math.min(depth * 0.45, 14);
+
+        // Vertical tower shaft
+        const shaftGeo = new THREE.BoxGeometry(mainW, towerH, mainD);
+        const shaft = new THREE.Mesh(shaftGeo, sharedDarkMat);
+        shaft.position.y = towerH / 2;
+        shaft.castShadow = true;
+        shaft.receiveShadow = true;
+        bGroup.add(shaft);
+        addWireframeEdges(shaft, bGroup);
+
+        // Cantilevered overhang volume projecting horizontally
+        const cantW = mainW * 1.5;
+        const cantH = 8;
+        const cantD = mainD * 0.9;
+        const cantGeo = new THREE.BoxGeometry(cantW, cantH, cantD);
+        const cantMesh = new THREE.Mesh(cantGeo, sharedDarkMat);
+        cantMesh.position.set(mainW * 0.35, towerH * 0.65, 0);
+        bGroup.add(cantMesh);
+        addWireframeEdges(cantMesh, bGroup);
+
+        // Rooftop antenna mast with blinking beacon
+        const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 10, 6), sharedDarkMat);
+        antenna.position.set(0, towerH + 5, 0);
+        bGroup.add(antenna);
+        addWireframeEdges(antenna, bGroup);
+
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+        beacon.position.set(0, towerH + 10, 0);
+        bGroup.add(beacon);
+        animatedPropsRef.current.blinkingLights.push(beacon);
+
+        // Glowing colored window slits
+        const slitMat = Math.random() > 0.5 ? neonAccentMats.cyan : neonAccentMats.yellow;
+        for (let f = 1; f <= 5; f++) {
+          const slit = new THREE.Mesh(new THREE.BoxGeometry(mainW * 0.6, 0.4, 0.1), slitMat);
+          slit.position.set(0, f * 7, mainD / 2 + 0.05);
+          bGroup.add(slit);
+        }
+
+        scene.add(bGroup);
+
+      } else if (plot.type === 'stepped') {
+        // --- Multi-tier Stepped Setback Tower (Picture 1 Center Style) ---
+        const bGroup = new THREE.Group();
+        bGroup.position.set(cx, 0, cz);
+
+        const baseW = Math.min(width * 0.6, 18);
+        const baseD = Math.min(depth * 0.6, 18);
+
+        // Tier 1
+        const t1H = 20;
+        const t1Mesh = new THREE.Mesh(new THREE.BoxGeometry(baseW, t1H, baseD), sharedDarkMat);
+        t1Mesh.position.y = t1H / 2;
+        bGroup.add(t1Mesh);
+        addWireframeEdges(t1Mesh, bGroup);
+
+        // Tier 2
+        const t2H = 18;
+        const t2W = baseW * 0.72;
+        const t2D = baseD * 0.72;
+        const t2Mesh = new THREE.Mesh(new THREE.BoxGeometry(t2W, t2H, t2D), sharedDarkMat);
+        t2Mesh.position.y = t1H + t2H / 2;
+        bGroup.add(t2Mesh);
+        addWireframeEdges(t2Mesh, bGroup);
+
+        // Tier 3
+        const t3H = 16;
+        const t3W = t2W * 0.65;
+        const t3D = t2D * 0.65;
+        const t3Mesh = new THREE.Mesh(new THREE.BoxGeometry(t3W, t3H, t3D), sharedDarkMat);
+        t3Mesh.position.y = t1H + t2H + t3H / 2;
+        bGroup.add(t3Mesh);
+        addWireframeEdges(t3Mesh, bGroup);
+
+        // Antenna
+        const topY = t1H + t2H + t3H;
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, 12, 6), sharedDarkMat);
+        mast.position.y = topY + 6;
+        bGroup.add(mast);
+        addWireframeEdges(mast, bGroup);
+
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00f0ff }));
+        beacon.position.y = topY + 12;
+        bGroup.add(beacon);
+        animatedPropsRef.current.blinkingLights.push(beacon);
+
+        // Window matrix dots
+        for (let row = 0; row < 4; row++) {
+          for (let col = -2; col <= 2; col++) {
+            if (Math.random() > 0.4) {
+              const win = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.05), neonAccentMats.green);
+              win.position.set(col * 2.2, 4 + row * 3.8, baseD / 2 + 0.05);
+              bGroup.add(win);
+            }
+          }
+        }
+
+        scene.add(bGroup);
+
+      } else if (plot.type === 'wedge') {
+        // --- Slanted Chamfered Wedge Skyscraper (Picture 1 Style) ---
+        const bGroup = new THREE.Group();
+        bGroup.position.set(cx, 0, cz);
+
+        const w = Math.min(width * 0.5, 16);
+        const d = Math.min(depth * 0.5, 16);
+        const h = 42 + Math.random() * 8;
+
+        const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), sharedDarkMat);
+        bodyMesh.position.y = h / 2;
+        bGroup.add(bodyMesh);
+        addWireframeEdges(bodyMesh, bGroup);
+
+        // Slanted wedge roof cap
+        const roofGeo = new THREE.ConeGeometry(w * 0.7, 10, 4);
+        roofGeo.rotateY(Math.PI / 4);
+        const roofMesh = new THREE.Mesh(roofGeo, sharedDarkMat);
+        roofMesh.position.y = h + 5;
+        bGroup.add(roofMesh);
+        addWireframeEdges(roofMesh, bGroup);
+
+        // Horizontal neon band
+        const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.4, d + 0.2), neonAccentMats.cyan);
+        band.position.y = h * 0.75;
+        bGroup.add(band);
+
+        scene.add(bGroup);
+
+      } else if (plot.type === 'spire') {
+        // --- Spire Megatower with Twin Flanking Columns ---
+        const bGroup = new THREE.Group();
+        bGroup.position.set(cx, 0, cz);
+
+        const centerH = 64;
+        const mainW = 10;
+        const mainD = 10;
+
+        const centerMesh = new THREE.Mesh(new THREE.BoxGeometry(mainW, centerH, mainD), sharedDarkMat);
+        centerMesh.position.y = centerH / 2;
+        bGroup.add(centerMesh);
+        addWireframeEdges(centerMesh, bGroup);
+
+        // Dual flank buttresses
+        [-8, 8].forEach(fx => {
+          const flankH = 36;
+          const flank = new THREE.Mesh(new THREE.BoxGeometry(4.5, flankH, mainD * 0.8), sharedDarkMat);
+          flank.position.set(fx, flankH / 2, 0);
+          bGroup.add(flank);
+          addWireframeEdges(flank, bGroup);
+        });
+
+        // Needle spire
+        const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.6, 22, 8), sharedDarkMat);
+        needle.position.y = centerH + 11;
+        bGroup.add(needle);
+        addWireframeEdges(needle, bGroup);
+
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+        beacon.position.y = centerH + 22;
+        bGroup.add(beacon);
+        animatedPropsRef.current.blinkingLights.push(beacon);
+
+        scene.add(bGroup);
+
+      } else if (plot.type === 'commercial' || plot.type === 'lowrise') {
+        // --- Commercial Mid-Rise with Matrix Windows / Staggered Cubes ---
+        const bGroup = new THREE.Group();
+        bGroup.position.set(cx, 0, cz);
+
+        const b1W = Math.min(width * 0.45, 14);
+        const b1D = Math.min(depth * 0.45, 14);
+        const b1H = 22 + Math.random() * 8;
+
+        const b1 = new THREE.Mesh(new THREE.BoxGeometry(b1W, b1H, b1D), sharedDarkMat);
+        b1.position.set(-b1W * 0.2, b1H / 2, -b1D * 0.2);
+        bGroup.add(b1);
+        addWireframeEdges(b1, bGroup);
+
+        // Secondary block in the plot
+        const b2W = b1W * 0.85;
+        const b2D = b1D * 0.85;
+        const b2H = b1H * 0.7;
+        const b2 = new THREE.Mesh(new THREE.BoxGeometry(b2W, b2H, b2D), sharedDarkMat);
+        b2.position.set(b2W * 0.45, b2H / 2, b2D * 0.45);
+        bGroup.add(b2);
+        addWireframeEdges(b2, bGroup);
+
+        // Window dot matrix on facades (Picture 1 style)
+        for (let floor = 0; floor < 5; floor++) {
+          for (let col = -2; col <= 2; col++) {
+            if (Math.random() > 0.35) {
+              const colors = [neonAccentMats.yellow, neonAccentMats.cyan, neonAccentMats.green, neonAccentMats.magenta];
+              const cMat = colors[Math.floor(Math.random() * colors.length)];
+              const win = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.05), cMat);
+              win.position.set(-b1W * 0.2 + col * 1.8, 3 + floor * 3.5, -b1D * 0.2 + b1D / 2 + 0.04);
+              bGroup.add(win);
+            }
+          }
+        }
+
+        scene.add(bGroup);
+      }
+    });
+
+    // --- 4 Hero Destination Buildings (Preserved Custom Aesthetics) ---
     DESTINATIONS.forEach(dest => {
       const group = new THREE.Group();
-      
-      // Building Box
-      const bGeo = new THREE.BoxGeometry(12, dest.height, 12);
-      const bMat = new THREE.MeshStandardMaterial({ 
-        color: dest.buildingColor, 
-        roughness: 0.6,
-        metalness: 0.2
-      });
-      const building = new THREE.Mesh(bGeo, bMat);
-      building.position.set(dest.position3D.x, dest.height / 2, dest.position3D.z);
-      building.castShadow = true;
-      building.receiveShadow = true;
-      group.add(building);
 
-      // Rooftop Accent
-      const roofGeo = new THREE.BoxGeometry(12.4, 0.4, 12.4);
-      const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
-      const roof = new THREE.Mesh(roofGeo, roofMat);
-      roof.position.set(dest.position3D.x, dest.height + 0.2, dest.position3D.z);
-      group.add(roof);
+      if (dest.id === 'home') {
+        // --- 1. HOME BASE (Fleet Depot & Terminal - North Sector) ---
+        const termGeo = new THREE.BoxGeometry(24, 18, 16);
+        const termMat = new THREE.MeshStandardMaterial({ color: 0x0c1324, metalness: 0.85, roughness: 0.25 });
+        const terminal = new THREE.Mesh(termGeo, termMat);
+        terminal.position.set(0, 9, -145);
+        terminal.castShadow = true;
+        terminal.receiveShadow = true;
+        group.add(terminal);
+        addWireframeEdges(terminal, group, 0x00f0ff);
 
-      const isNorth = dest.id === 'home';
-      const isEast = dest.id === 'publications';
-      const isSouth = dest.id === 'blog';
-      const isWest = dest.id === 'about';
+        // Glass Curtain Wall facing South towards North Avenue
+        const glassMat = new THREE.MeshStandardMaterial({
+          color: 0x00f0ff,
+          emissive: 0x00f0ff,
+          emissiveIntensity: 0.4,
+          roughness: 0.1,
+          metalness: 0.9,
+          transparent: true,
+          opacity: 0.85
+        });
+        const glassWall = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 0.4), glassMat);
+        glassWall.position.set(0, 8, -136.8);
+        group.add(glassWall);
 
-      // Concrete Sidewalk in front of building entrance
-      const walkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
-      let walkGeo;
-      let walkPos = { x: dest.position3D.x, y: 0.04, z: dest.position3D.z };
+        // Cantilevered Canopy
+        const canopyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7 });
+        const canopy = new THREE.Mesh(new THREE.BoxGeometry(22, 1.2, 10), canopyMat);
+        canopy.position.set(0, 8.5, -137);
+        group.add(canopy);
+        addWireframeEdges(canopy, group, 0x00f0ff);
 
-      if (isNorth) {
-        walkGeo = new THREE.BoxGeometry(16, 0.08, 4);
-        walkPos = { x: 0, y: 0.04, z: -66 };
-      } else if (isSouth) {
-        walkGeo = new THREE.BoxGeometry(16, 0.08, 4);
-        walkPos = { x: 0, y: 0.04, z: 66 };
-      } else if (isEast) {
-        walkGeo = new THREE.BoxGeometry(4, 0.08, 16);
-        walkPos = { x: 66, y: 0.04, z: 0 };
-      } else { // West
-        walkGeo = new THREE.BoxGeometry(4, 0.08, 16);
-        walkPos = { x: -66, y: 0.04, z: 0 };
-      }
-      const sidewalk = new THREE.Mesh(walkGeo, walkMat);
-      sidewalk.position.set(walkPos.x, walkPos.y, walkPos.z);
-      sidewalk.receiveShadow = true;
-      group.add(sidewalk);
+        // Dual Supercharger Pylons
+        [-6, 6].forEach(px => {
+          const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4, 0.9), new THREE.MeshStandardMaterial({ color: 0x090d16 }));
+          pylon.position.set(px, 2, -133);
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.2, 0.92), neonAccentMats.cyan);
+          pylon.add(bar);
+          group.add(pylon);
+        });
 
-      // Windows on front facade facing road
-      const winMat = new THREE.MeshStandardMaterial({ 
-        color: 0x60a5fa, 
-        emissive: 0x60a5fa, 
-        emissiveIntensity: 0.6 
-      });
-      for (let floor = 0; floor < Math.floor(dest.height / 3); floor++) {
-        for (let col = -1; col <= 1; col++) {
-          const w = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.2), winMat);
-          const y = 3 + floor * 2.8;
-          if (isNorth) {
-            w.position.set(dest.position3D.x + col * 3, y, dest.position3D.z + 6.1);
-          } else if (isSouth) {
-            w.position.set(dest.position3D.x + col * 3, y, dest.position3D.z - 6.1);
-          } else if (isEast) {
-            w.rotation.y = Math.PI / 2;
-            w.position.set(dest.position3D.x - 6.1, y, dest.position3D.z + col * 3);
-          } else { // West
-            w.rotation.y = Math.PI / 2;
-            w.position.set(dest.position3D.x + 6.1, y, dest.position3D.z + col * 3);
-          }
-          group.add(w);
+        // 3D Illuminated Signboard
+        const homeSign = createBillboardMesh(18, 4.5, 'HOME BASE', 'FLEET COMMAND // DEPOT-01', '#00f0ff');
+        homeSign.position.set(0, 16.5, -136.7);
+        group.add(homeSign);
+
+      } else if (dest.id === 'publications') {
+        // --- 2. PUBLICATIONS HUB (CV & ML Research Institute - East Sector) ---
+        const labTowerMat = new THREE.MeshStandardMaterial({ color: 0x064e3b, metalness: 0.7, roughness: 0.3 });
+        
+        const tower1 = new THREE.Mesh(new THREE.BoxGeometry(12, 28, 12), labTowerMat);
+        tower1.position.set(145, 14, -8);
+        tower1.castShadow = true;
+        group.add(tower1);
+        addWireframeEdges(tower1, group, 0x10b981);
+
+        const tower2 = new THREE.Mesh(new THREE.BoxGeometry(12, 24, 12), labTowerMat);
+        tower2.position.set(145, 12, 8);
+        tower2.castShadow = true;
+        group.add(tower2);
+        addWireframeEdges(tower2, group, 0x10b981);
+
+        // Skybridge connecting the towers
+        const skybridge = new THREE.Mesh(
+          new THREE.BoxGeometry(8, 5, 16),
+          new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x059669, emissiveIntensity: 0.45, transparent: true, opacity: 0.85 })
+        );
+        skybridge.position.set(145, 18, 0);
+        group.add(skybridge);
+        addWireframeEdges(skybridge, group, 0x10b981);
+
+        // Quantum Data Core with glowing revolving rings
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 20, 24), coreMat);
+        core.position.set(145, 11, 0);
+        group.add(core);
+
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+        for (let r = 0; r < 3; r++) {
+          const cRing = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.15, 8, 32), ringMat);
+          cRing.rotation.x = Math.PI / 2;
+          cRing.position.set(145, 6 + r * 5, 0);
+          group.add(cRing);
         }
+
+        // Rotating rooftop radar dish
+        const radarGroup = new THREE.Group();
+        radarGroup.position.set(145, 29, -8);
+        const dish = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.5, 0.3, 0.4, 16),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+        );
+        dish.rotation.z = Math.PI / 3;
+        radarGroup.add(dish);
+        group.add(radarGroup);
+        animatedPropsRef.current.radarDishes.push(radarGroup);
+
+        // 3D Neon Sign facing West towards East Avenue
+        const pubSign = createBillboardMesh(18, 4.5, 'PUBLICATIONS', 'CV & ML RESEARCH LAB', '#10b981');
+        pubSign.position.set(137.8, 19, 0);
+        pubSign.rotation.y = -Math.PI / 2;
+        group.add(pubSign);
+
+      } else if (dest.id === 'blog') {
+        // --- 3. BLOG TOWER (Stepped Cyber Megatower - South Sector) ---
+        const towerMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, metalness: 0.8, roughness: 0.25 });
+
+        // 3-Stage Stepped Architecture
+        const base = new THREE.Mesh(new THREE.BoxGeometry(20, 18, 20), towerMat);
+        base.position.set(0, 9, 145);
+        base.castShadow = true;
+        group.add(base);
+        addWireframeEdges(base, group, 0xf59e0b);
+
+        const mid = new THREE.Mesh(new THREE.BoxGeometry(15, 18, 15), towerMat);
+        mid.position.set(0, 27, 145);
+        mid.castShadow = true;
+        group.add(mid);
+        addWireframeEdges(mid, group, 0xf59e0b);
+
+        const top = new THREE.Mesh(new THREE.BoxGeometry(10, 16, 10), towerMat);
+        top.position.set(0, 44, 145);
+        top.castShadow = true;
+        group.add(top);
+        addWireframeEdges(top, group, 0xf59e0b);
+
+        // Helipad with glowing ring atop roof
+        const helipad = new THREE.Mesh(
+          new THREE.CylinderGeometry(4.8, 4.8, 0.4, 24),
+          new THREE.MeshStandardMaterial({ color: 0x292524 })
+        );
+        helipad.position.set(0, 52.2, 145);
+        group.add(helipad);
+
+        const heliRing = new THREE.Mesh(new THREE.RingGeometry(4.3, 4.6, 24), neonAccentMats.yellow);
+        heliRing.rotation.x = -Math.PI / 2;
+        heliRing.position.set(0, 52.45, 145);
+        group.add(heliRing);
+
+        // Communications needle mast
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 16, 8), sharedDarkMat);
+        mast.position.set(0, 60, 145);
+        group.add(mast);
+
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+        beacon.position.set(0, 68, 145);
+        group.add(beacon);
+        animatedPropsRef.current.blinkingLights.push(beacon);
+
+        // 3D Neon Sign facing North towards South Avenue
+        const blogSign = createBillboardMesh(18, 4.5, 'BLOG TOWER', 'TECH PERSPECTIVES // 01', '#f59e0b');
+        blogSign.position.set(0, 22, 134.8);
+        group.add(blogSign);
+
+      } else {
+        // --- 4. ABOUT PLAZA (Cybernetic Pavilion & Atrium - West Sector) ---
+        const dais = new THREE.Mesh(
+          new THREE.CylinderGeometry(14, 15, 1.4, 8),
+          new THREE.MeshStandardMaterial({ color: 0x2e1065, metalness: 0.8, roughness: 0.3 })
+        );
+        dais.position.set(-145, 0.7, 0);
+        dais.receiveShadow = true;
+        group.add(dais);
+        addWireframeEdges(dais, group, 0x8b5cf6);
+
+        // 4 Illuminated Cyber-Pillars
+        const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
+        [
+          { x: -145 - 6, z: -6 },
+          { x: -145 + 6, z: -6 },
+          { x: -145 - 6, z: 6 },
+          { x: -145 + 6, z: 6 },
+        ].forEach(pp => {
+          const pillar = new THREE.Mesh(new THREE.BoxGeometry(2, 15, 2), pillarMat);
+          pillar.position.set(pp.x, 7.5, pp.z);
+          pillar.castShadow = true;
+          const neonSlot = new THREE.Mesh(new THREE.BoxGeometry(0.3, 14.5, 2.05), new THREE.MeshBasicMaterial({ color: 0x8b5cf6 }));
+          pillar.add(neonSlot);
+          group.add(pillar);
+          addWireframeEdges(pillar, group, 0x8b5cf6);
+        });
+
+        // Translucent Faceted Crystal Canopy
+        const canopy = new THREE.Mesh(
+          new THREE.CylinderGeometry(13, 15, 1.6, 8),
+          new THREE.MeshStandardMaterial({
+            color: 0x7c3aed,
+            emissive: 0x6d28d9,
+            emissiveIntensity: 0.45,
+            transparent: true,
+            opacity: 0.8
+          })
+        );
+        canopy.position.set(-145, 15.5, 0);
+        group.add(canopy);
+        addWireframeEdges(canopy, group, 0x8b5cf6);
+
+        // Floating, Rotating Hologram Core
+        const holoOrb = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(2.5, 1),
+          new THREE.MeshStandardMaterial({
+            color: 0xa855f7,
+            emissive: 0xc084fc,
+            emissiveIntensity: 0.85,
+            wireframe: true
+          })
+        );
+        holoOrb.position.set(-145, 8, 0);
+        group.add(holoOrb);
+        animatedPropsRef.current.holoOrb = holoOrb;
+
+        // 3D Neon Sign facing East towards West Avenue
+        const aboutSign = createBillboardMesh(18, 4.5, 'ABOUT PLAZA', 'AI & ROBOTICS // KALYANI', '#8b5cf6');
+        aboutSign.position.set(-137.8, 17, 0);
+        aboutSign.rotation.y = Math.PI / 2;
+        group.add(aboutSign);
       }
 
-      // Parking / Stop Box painted on road
-      const stopLineMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-      const stopBoxGeo = new THREE.PlaneGeometry(7, 5);
-      const stopBox = new THREE.Mesh(stopBoxGeo, stopLineMat);
+      // Parking / Docking Stop Box on the road
+      const isEast = dest.id === 'publications';
+      const isWest = dest.id === 'about';
+      const stopLineMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.85 });
+      const stopBox = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), stopLineMat);
       stopBox.rotation.x = -Math.PI / 2;
       if (isEast || isWest) stopBox.rotation.z = Math.PI / 2;
-      stopBox.position.set(dest.stopPosition.x, 0.025, dest.stopPosition.z);
+      stopBox.position.set(dest.stopPosition.x, 0.026, dest.stopPosition.z);
       group.add(stopBox);
 
       scene.add(group);
-      buildingsRef.current.push(group);
     });
 
-    // Vehicle
+    // --- Cyber Vehicle Model ---
     const car = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 0.7, 4.4),
-      new THREE.MeshStandardMaterial({ color: 0x1a4d8f, metalness: 0.8, roughness: 0.3 })
+
+    // Chassis Underglow
+    const underglow = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.6, 5.8),
+      new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.5 })
     );
+    underglow.rotation.x = -Math.PI / 2;
+    underglow.position.y = 0.04;
+    car.add(underglow);
+
+    // Main Body
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0e172a, metalness: 0.9, roughness: 0.25 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.8, 4.6), bodyMat);
     body.position.y = 0.55;
     body.castShadow = true;
     car.add(body);
 
+    // Windshield / Cabin
     const cabin = new THREE.Mesh(
-      new THREE.BoxGeometry(1.9, 0.8, 2.4),
-      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.1 })
+      new THREE.BoxGeometry(1.95, 0.85, 2.5),
+      new THREE.MeshStandardMaterial({ color: 0x050912, metalness: 0.95, roughness: 0.1 })
     );
-    cabin.position.y = 1.25;
-    cabin.position.z = -0.4;
+    cabin.position.set(0, 1.3, -0.4);
     cabin.castShadow = true;
     car.add(cabin);
 
+    // 4 Wheels with Cyan Cyber Rims
+    const wheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.36, 16);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.8 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.9, roughness: 0.2 });
+    [
+      { x: -1.2, z: 1.45 },
+      { x: 1.2, z: 1.45 },
+      { x: -1.2, z: -1.45 },
+      { x: 1.2, z: -1.45 },
+    ].forEach(wPos => {
+      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(wPos.x, 0.44, wPos.z);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.37, 12), rimMat);
+      wheel.add(rim);
+      car.add(wheel);
+    });
+
+    // Spinning Roof LiDAR Sensor Puck
+    const lidarBase = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.2, 16), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+    lidarBase.position.set(0, 1.82, -0.4);
+    car.add(lidarBase);
+
+    const lidarPuck = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.36, 0.36, 0.32, 16),
+      new THREE.MeshStandardMaterial({ color: 0x090e1a, metalness: 0.9 })
+    );
+    lidarPuck.position.set(0, 2.05, -0.4);
+    const diode = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.1), new THREE.MeshBasicMaterial({ color: 0x10b981 }));
+    diode.position.set(0, 0, 0.32);
+    lidarPuck.add(diode);
+    car.add(lidarPuck);
+    animatedPropsRef.current.lidarPuck = lidarPuck;
+
     // Headlights
     const lightMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.1), lightMat);
-    hl1.position.set(0.7, 0.55, 2.21);
+    const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.1), lightMat);
+    hl1.position.set(0.72, 0.58, 2.31);
     car.add(hl1);
-    const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.1), lightMat);
-    hl2.position.set(-0.7, 0.55, 2.21);
+    const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.1), lightMat);
+    hl2.position.set(-0.72, 0.58, 2.31);
     car.add(hl2);
 
-    // Initial Position (Parked at Home Base: x=0, z=-60, facing East along circuit)
-    car.position.set(0, 0.1, -60);
-    car.rotation.y = Math.PI / 2;
+    // Light Cones
+    const beamGeo = new THREE.ConeGeometry(1.5, 12, 16);
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18, depthWrite: false });
+    const beam1 = new THREE.Mesh(beamGeo, beamMat);
+    beam1.rotation.x = -Math.PI / 2 + 0.08;
+    beam1.position.set(0.72, 0.5, 8.2);
+    car.add(beam1);
+    const beam2 = new THREE.Mesh(beamGeo, beamMat);
+    beam2.rotation.x = -Math.PI / 2 + 0.08;
+    beam2.position.set(-0.72, 0.5, 8.2);
+    car.add(beam2);
 
+    // Red Taillights
+    const tailMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    const tl1 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.15, 0.1), tailMat);
+    tl1.position.set(0.72, 0.62, -2.31);
+    car.add(tl1);
+    const tl2 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.15, 0.1), tailMat);
+    tl2.position.set(-0.72, 0.62, -2.31);
+    car.add(tl2);
+
+    // Start parked at Home Base (North Avenue: x=0, z=-130, facing East)
+    car.position.set(0, 0.1, -130);
+    car.rotation.y = Math.PI / 2;
     carRef.current = car;
     scene.add(car);
 
-    // Render Loop
+    // --- Render Loop ---
     let frame = 0;
     let animId: number;
+
     const animate = () => {
       animId = requestAnimationFrame(animate);
       frame++;
-      
-      if (!isNavigating && carRef.current) {
-        carRef.current.position.y = 0.1 + Math.sin(frame * 0.03) * 0.03;
+
+      // Subtle vehicle hovering idle animation
+      if (!isNavigatingRef.current && carRef.current) {
+        carRef.current.position.y = 0.1 + Math.sin(frame * 0.03) * 0.025;
       } else if (carRef.current) {
         carRef.current.position.y = 0.1;
       }
 
-      // Smooth camera reset animation
-      if (isResettingCameraRef.current && cameraRef.current && carRef.current && controlsRef.current) {
-        const carX = carRef.current.position.x;
-        const carZ = carRef.current.position.z;
-        const targetCamX = carX * 0.35;
-        const targetCamY = 48;
-        const targetCamZ = carZ * 0.35;
+      // Animated Props
+      if (animatedPropsRef.current.lidarPuck) {
+        animatedPropsRef.current.lidarPuck.rotation.y += 0.08;
+      }
+      animatedPropsRef.current.radarDishes.forEach(dish => {
+        dish.rotation.y += 0.02;
+      });
+      if (animatedPropsRef.current.holoOrb) {
+        animatedPropsRef.current.holoOrb.rotation.y += 0.015;
+        animatedPropsRef.current.holoOrb.rotation.z += 0.008;
+        animatedPropsRef.current.holoOrb.position.y = 8 + Math.sin(frame * 0.04) * 0.4;
+      }
+      animatedPropsRef.current.blinkingLights.forEach(b => {
+        const mat = b.material as THREE.MeshBasicMaterial;
+        if (mat) mat.opacity = Math.sin(frame * 0.08) > 0.1 ? 1 : 0.15;
+      });
 
-        cameraRef.current.position.x += (targetCamX - cameraRef.current.position.x) * 0.08;
-        cameraRef.current.position.y += (targetCamY - cameraRef.current.position.y) * 0.08;
-        cameraRef.current.position.z += (targetCamZ - cameraRef.current.position.z) * 0.08;
-
-        controlsRef.current.target.x += (carX - controlsRef.current.target.x) * 0.08;
-        controlsRef.current.target.y += (2 - controlsRef.current.target.y) * 0.08;
-        controlsRef.current.target.z += (carZ - controlsRef.current.target.z) * 0.08;
-
+      // Smooth Camera Animation & Lerping
+      if (isResettingCameraRef.current && cameraRef.current && controlsRef.current) {
+        cameraRef.current.position.lerp(targetCamPosRef.current, 0.06);
+        controlsRef.current.target.lerp(targetLookAtRef.current, 0.06);
         cameraRef.current.lookAt(controlsRef.current.target);
 
-        const distCam = Math.hypot(
-          cameraRef.current.position.x - targetCamX,
-          cameraRef.current.position.y - targetCamY,
-          cameraRef.current.position.z - targetCamZ
-        );
-
-        if (distCam < 0.1) {
-          cameraRef.current.position.set(targetCamX, targetCamY, targetCamZ);
-          controlsRef.current.target.set(carX, 2, carZ);
+        if (cameraRef.current.position.distanceTo(targetCamPosRef.current) < 0.5) {
+          cameraRef.current.position.copy(targetCamPosRef.current);
+          controlsRef.current.target.copy(targetLookAtRef.current);
           controlsRef.current.update();
           isResettingCameraRef.current = false;
         }
       } else if (controlsRef.current && controlsRef.current.enabled) {
         controlsRef.current.update();
       }
-      
+
       renderer.render(scene, camera);
     };
+
     animate();
 
     return () => {
@@ -1204,51 +1552,76 @@ const AutonomousBlog = () => {
       isResettingCameraRef.current = false;
     } else {
       controlsRef.current.enabled = true;
-      if (carRef.current) {
-        controlsRef.current.target.set(carRef.current.position.x, 2, carRef.current.position.z);
-        controlsRef.current.update();
-      }
     }
   }, [isNavigating]);
 
-  const handleResetView = () => {
+  // Camera View Mode Switching
+  const setCameraTopDown = () => {
     if (isNavigating) return;
+    setViewMode('topDown');
+    targetCamPosRef.current.set(0, 240, 25);
+    targetLookAtRef.current.set(0, 0, 0);
     isResettingCameraRef.current = true;
   };
 
-  // --- Navigation Logic ---
-  const navigateTo = (destination: any) => {
+  const setCameraFocusCar = () => {
+    if (isNavigating || !carRef.current) return;
+    setViewMode('follow');
+    const carPos = carRef.current.position;
+    const heading = carRef.current.rotation.y;
+    targetCamPosRef.current.set(
+      carPos.x - Math.sin(heading) * 26,
+      carPos.y + 14,
+      carPos.z - Math.cos(heading) * 26
+    );
+    targetLookAtRef.current.set(carPos.x, 2, carPos.z);
+    isResettingCameraRef.current = true;
+  };
+
+  const handleResetView = () => {
+    if (isNavigating) return;
+    if (viewMode === 'topDown') {
+      setCameraFocusCar();
+    } else {
+      setCameraTopDown();
+    }
+  };
+
+  // --- Navigation Trigger ---
+  const navigateTo = (destination: DestinationItem) => {
     if (isNavigating) return;
     if (currentPosition.id === destination.id) {
       setSelectedDestination(destination);
       return;
     }
 
-    const routePath = computeRoute(currentPosition.id, destination.id);
+    const routePath = computeCityRoute(currentPosition.id, destination.id);
     if (!routePath || routePath.length < 2) return;
 
     setCurrentRoute({ path: routePath, destination });
     setIsNavigating(true);
+    setViewMode('follow');
     setCurrentPosition(destination);
   };
 
-  // --- Animation Loop for Movement ---
+  // --- Navigation Movement & Camera Follow Loop ---
   useEffect(() => {
     if (!isNavigating || currentRoute.path.length === 0) return;
 
-    const SPEED = 0.55;
-    const ROTATION_SPEED = 0.14;
+    const SPEED = 0.65;
+    const ROTATION_SPEED = 0.12;
     let currentSegmentIndex = 0;
     let animId: number;
 
     const animateMovement = () => {
       if (!carRef.current) return;
-      
       const path = currentRoute.path;
+
       if (currentSegmentIndex >= path.length - 1) {
-        // Reached destination
+        // Reached Destination
         setIsNavigating(false);
         setNavigationProgress(1);
+        setViewMode('hero');
         setTimeout(() => setSelectedDestination(currentRoute.destination), 500);
         return;
       }
@@ -1257,23 +1630,22 @@ const AutonomousBlog = () => {
       const target = path[currentSegmentIndex + 1];
       const current = carRef.current.position;
 
-      // 1. Calculate direction to target
+      // 1. Calculate direction to target waypoint
       const dx = target.x - current.x;
       const dz = target.z - current.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
 
-      // 2. Determine target angle
+      // 2. Target heading angle
       const targetRotation = Math.atan2(dx, dz);
-      
+
       // 3. Smoothly rotate car towards target
       let rotDiff = targetRotation - carRef.current.rotation.y;
       while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
       while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-      
       carRef.current.rotation.y += rotDiff * ROTATION_SPEED;
 
       // 4. Move car forward
-      if (Math.abs(rotDiff) < 0.8) {
+      if (Math.abs(rotDiff) < 0.85) {
         const currentSpeed = isFinalSegment 
           ? Math.max(0.12, Math.min(SPEED, dist * 0.22))
           : SPEED;
@@ -1287,12 +1659,11 @@ const AutonomousBlog = () => {
           path[currentSegmentIndex + 1].z - path[currentSegmentIndex].z
         );
         const segmentProgress = segmentLen > 0.01 ? 1 - (dist / segmentLen) : 1;
-        
         setNavigationProgress(
           Math.min(1, (currentSegmentIndex + segmentProgress) / totalSegments)
         );
 
-        if (isFinalSegment && dist < 0.25) {
+        if (isFinalSegment && dist < 0.3) {
           carRef.current.position.x = target.x;
           carRef.current.position.z = target.z;
           if (target.heading !== undefined) {
@@ -1301,29 +1672,39 @@ const AutonomousBlog = () => {
           currentSegmentIndex++;
           setIsNavigating(false);
           setNavigationProgress(1);
+          setViewMode('hero');
           setTimeout(() => setSelectedDestination(currentRoute.destination), 500);
           return;
-        } else if (!isFinalSegment && dist < 0.8) {
+        } else if (!isFinalSegment && dist < 1.2) {
           currentSegmentIndex++;
         }
       }
 
-      // Camera Follow Logic (Inside-out elevated view from courtyard)
+      // 5. CAMERA FOLLOW CAR (Third-person chase camera closely tracking the car)
       if (cameraRef.current && carRef.current) {
         const carX = carRef.current.position.x;
+        const carY = carRef.current.position.y;
         const carZ = carRef.current.position.z;
-        if (!isNaN(carX) && !isNaN(carZ)) {
-          // Camera stays elevated inside the central courtyard
-          const targetCamX = carX * 0.35;
-          const targetCamZ = carZ * 0.35;
-          const targetCamY = 48;
-          cameraRef.current.position.x += (targetCamX - cameraRef.current.position.x) * 0.05;
-          cameraRef.current.position.y += (targetCamY - cameraRef.current.position.y) * 0.05;
-          cameraRef.current.position.z += (targetCamZ - cameraRef.current.position.z) * 0.05;
-          cameraRef.current.lookAt(carX, 2, carZ);
-          if (controlsRef.current) {
-            controlsRef.current.target.set(carX, 2, carZ);
-          }
+        const heading = carRef.current.rotation.y;
+
+        // Smooth follow position: behind and above the car
+        const followDist = 26;
+        const followHeight = 14;
+        const targetCamX = carX - Math.sin(heading) * followDist;
+        const targetCamZ = carZ - Math.cos(heading) * followDist;
+        const targetCamY = carY + followHeight;
+
+        cameraRef.current.position.x += (targetCamX - cameraRef.current.position.x) * 0.08;
+        cameraRef.current.position.y += (targetCamY - cameraRef.current.position.y) * 0.08;
+        cameraRef.current.position.z += (targetCamZ - cameraRef.current.position.z) * 0.08;
+
+        const targetLookX = carX + Math.sin(heading) * 8;
+        const targetLookZ = carZ + Math.cos(heading) * 8;
+        if (controlsRef.current) {
+          controlsRef.current.target.x += (targetLookX - controlsRef.current.target.x) * 0.1;
+          controlsRef.current.target.y += (carY + 2 - controlsRef.current.target.y) * 0.1;
+          controlsRef.current.target.z += (targetLookZ - controlsRef.current.target.z) * 0.1;
+          cameraRef.current.lookAt(controlsRef.current.target);
         }
       }
 
@@ -1335,36 +1716,37 @@ const AutonomousBlog = () => {
   }, [isNavigating, currentRoute]);
 
   const closeModal = () => {
-  setSelectedDestination(null);
-  setSelectedBlogPost(null);
+    setSelectedDestination(null);
+    setSelectedBlogPost(null);
   };
+
   const renderContent = () => {
     if (!selectedDestination) return null;
-    // ... Content remains the same, just keeping it concise for this block
-    const content = {
-        home: { title: 'Mission Control', body: (
+    const content: Record<string, { title: string; body: React.ReactNode }> = {
+      home: { 
+        title: 'Mission Control', 
+        body: (
           <div className="space-y-6">
             <p className="text-gray-300 text-lg leading-relaxed">
-              Welcome to my autonomous portfolio. This interface represents a living digital twin of my work in machine learning and computer vision.
+              Think of this as a virtual city tour, except the car is currently on training wheels following hardcoded paths (procedural city generation and actual pathfinding coming in v2)
             </p>
-
             <div className="bg-slate-800/60 p-5 rounded-xl border border-slate-700">
               <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-                <Navigation2 className="w-5 h-5 text-blue-400" />
-                Navigation Protocols
+                <Navigation2 className="w-5 h-5 text-cyan-400" />
+                How to Hitch a Ride
               </h3>
               <ul className="space-y-3 text-gray-300">
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">1</span>
-                  <span>Select a destination from the <strong>Control Center</strong> on the left (Publications, Blog, or About).</span>
+                  <span>Pick a stop from the <strong>Control Center</strong> on the left.</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">2</span>
-                  <span>The vehicle will autonomously pathfind and drive to the selected building in the 3D view.</span>
+                  <span>Ride shotgun while the car cruises thorugh the city streets </span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">3</span>
-                  <span>Upon arrival, the details for that section will automatically appear here.</span>
+                  <span>Hop out at your destination to check out my resume, blog posts, or my lone research paper (not for long hopefully 🤞)</span>
                 </li>
               </ul>
             </div>
@@ -1384,165 +1766,204 @@ const AutonomousBlog = () => {
           </div>
         ) 
       },
-  publications: {
-  title: 'Mitigating SSRF Threats: Integrating ML and Network Architecture',
-  body: (
-    <div className="text-gray-300">
-      <p>
-        Server Side Request Forgery (SSRF) is a vulnerability that when exploited,
-        allows the attacker to manipulate the server into making requests to the
-        organization's internal network. In this research, we explore the various
-        consequences of SSRF and introduce a system which integrates an Intrusion
-        Detection System (IDS) and Intrusion Prevention System (IPS) with a 
-        dedicated helper server implemented using Nginx. Machine learning models, 
-        including XGBoost, are employed for threat detection, achieving high 
-        accuracy (98.55%) in classifying URLs as benign or malicious. The study 
-        highlights the efficacy of the proposed approach in mitigating SSRF threats.
-      </p>
-
-      <a
-        href="https://link.springer.com/chapter/10.1007/978-981-97-8669-5_1#citeas"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white">
-          Read Paper
-        </button>
-      </a>
-    </div>
-  )
-},
-blog: {
-  title: 'Blog Tower',
-  body: null
-},
-about: {
-  title: 'About Plaza',
-  body: (
-    <p className="text-gray-300">
-      I'm Kalyani — a machine learning enthusiast with a habit of turning complex problems into things that actually work (most of the time). 
-      My interests sit at the intersection of Computer Vision, autonomous systems, and safety-critical AI, especially making advanced 
-      driver-assistance features as universal as seatbelts, not luxury add-ons.
-      <br /><br />
-      I've worked on everything from 3D scene reconstruction and Gaussian splatting to real-time visualization of HD maps and LiDAR data. 
-      Recently, I've been part of a team building a full-scale environment visualization system for autonomous vehicles, where I focus on 
-      rendering static structures like buildings and trees. (If it doesn't move, I make it look good.)
-      <br /><br />
-      When I'm not elbow-deep in sensor fusion, Transformers, or regression models, I'm usually learning languages, watching Spy x Family, 
-      or attempting to develop chess intuition without blundering my queen.
-      <br /><br />
-      I like building things that are fast, reliable, and safe — whether that's a predictive model or a visualization pipeline — and I enjoy 
-      solving problems that don't come with a neat answer at the back of the book.
-      <br /><br />
-      If you're interested in collaborating on CV, robotics, or anything that involves turning data into decisions, feel free to reach out 
-      at kalyanikulkarni2002@gmail.com.
-      <br /><br />
-      <a 
-        href="https://drive.google.com/file/d/1ObAfUlCZxJTFjtayz1PFJjWL0vS4abp_/view?usp=drive_link"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-400 underline hover:text-blue-300"
-      >
-        View my résumé
-      </a>
-    </p>
-  )
-}
-  };
+      publications: {
+        title: 'Mitigating SSRF Threats: Integrating ML and Network Architecture',
+        body: (
+          <div className="text-gray-300">
+            <p>
+              Server Side Request Forgery (SSRF) is a vulnerability that when exploited,
+              allows the attacker to manipulate the server into making requests to the
+              organization's internal network. In this research, we explore the various
+              consequences of SSRF and introduce a system which integrates an Intrusion
+              Detection System (IDS) and Intrusion Prevention System (IPS) with a 
+              dedicated helper server implemented using Nginx. Machine learning models, 
+              including XGBoost, are employed for threat detection, achieving high 
+              accuracy (98.55%) in classifying URLs as benign or malicious. The study 
+              highlights the efficacy of the proposed approach in mitigating SSRF threats.
+            </p>
+            <a
+              href="https://link.springer.com/chapter/10.1007/978-981-97-8669-5_1#citeas"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium">
+                Read Paper
+              </button>
+            </a>
+          </div>
+        )
+      },
+      blog: {
+        title: 'Blog Tower',
+        body: null
+      },
+      about: {
+        title: 'About Plaza',
+        body: (
+          <p className="text-gray-300 leading-relaxed">
+            I'm Kalyani — a machine learning enthusiast with a habit of turning complex problems into things that actually work (most of the time). 
+            My interests sit at the intersection of Computer Vision, autonomous systems, and safety-critical AI, especially making advanced 
+            driver-assistance features as universal as seatbelts, not luxury add-ons.
+            <br /><br />
+            I've worked on everything from 3D scene reconstruction and Gaussian splatting to real-time visualization of HD maps and LiDAR data. 
+            Recently, I've been part of a team building a full-scale environment visualization system for autonomous vehicles, where I focus on 
+            rendering static structures like buildings and trees. (If it doesn't move, I make it look good.)
+            <br /><br />
+            When I'm not elbow-deep in sensor fusion, Transformers, or regression models, I'm usually learning languages, watching Spy x Family, 
+            or attempting to develop chess intuition without blundering my queen.
+            <br /><br />
+            If you're interested in collaborating on CV, robotics, or anything that involves turning data into decisions, feel free to reach out 
+            at kalyanikulkarni2002@gmail.com.
+            <br /><br />
+            <a 
+              href="https://drive.google.com/file/d/1ObAfUlCZxJTFjtayz1PFJjWL0vS4abp_/view?usp=drive_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cyan-400 underline hover:text-cyan-300 font-semibold"
+            >
+              View my résumé
+            </a>
+          </p>
+        )
+      }
+    };
     return content[selectedDestination.id] || { title: '', body: null };
   };
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-7xl h-[850px] bg-slate-950 rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
+      <div className="w-full max-w-7xl h-[860px] bg-slate-950 rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
         <div className="grid grid-cols-5 h-full">
           
-          {/* --- Sidebar (Refactored Layout) --- */}
-          <div className="col-span-2 bg-slate-900 border-r border-slate-800 flex flex-col h-full">
-            
-            {/* 1. Header Title */}
-            <div className="p-6 border-b border-slate-800 bg-slate-950">
-              <h2 className="text-white text-xl font-bold flex items-center gap-2 mb-2">
-                <Navigation2 className="w-6 h-6 text-blue-500" />
-                Control Center
-              </h2>
-              <p className="text-gray-400 text-sm">Where do you want to go?</p>
+          {/* --- Sidebar (Control Center) --- */}
+          <div className="col-span-2 bg-slate-900/95 border-r border-slate-800 flex flex-col h-full backdrop-blur">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-800/80 bg-slate-950/80">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-white text-xl font-bold flex items-center gap-2">
+                  <Navigation2 className="w-5 h-5 text-cyan-400" />
+                  Control Center
+                </h2>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold tracking-wider">
+                  V2X MATRIX ONLINE
+                </span>
+              </div>
+              <p className="text-gray-400 text-xs font-mono tracking-wide">AUTONOMOUS CADASTRAL CITY SYSTEM</p>
             </div>
             
-            {/* 2. Destination List */}
-            <div className="p-4 space-y-3 bg-slate-900 flex-1 overflow-y-auto">
+            {/* Destination List */}
+            <div className="p-4 space-y-3 bg-slate-900/60 flex-1 overflow-y-auto">
               {DESTINATIONS.map(dest => (
                 <button
                   key={dest.id}
                   onClick={() => navigateTo(dest)}
                   disabled={isNavigating}
-                  className={`w-full px-4 py-4 text-left rounded-xl transition-all border border-slate-700 flex items-center gap-4 group
-                    ${currentPosition.id === dest.id ? 'bg-slate-800 border-blue-500/50' : 'hover:bg-slate-800 hover:border-slate-600'}
+                  className={`w-full px-4 py-4 text-left rounded-xl transition-all border flex items-center gap-4 group
+                    ${currentPosition.id === dest.id 
+                      ? 'bg-slate-800/90 border-cyan-500/80 shadow-[0_0_15px_rgba(6,182,212,0.18)]' 
+                      : 'border-slate-800 bg-slate-900/40 hover:bg-slate-800/60 hover:border-slate-700'}
                     ${isNavigating ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
                 >
-                  <div className={`p-2 rounded-lg ${currentPosition.id === dest.id ? 'bg-blue-500/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                  <div className={`p-2.5 rounded-lg transition-transform group-hover:scale-105 ${currentPosition.id === dest.id ? 'bg-cyan-500/20' : 'bg-slate-800/80 group-hover:bg-slate-700'}`}>
                     <dest.icon className="w-5 h-5" style={{ color: dest.color }} />
                   </div>
                   <div className="flex-1">
-                    <div className="font-semibold text-slate-200">{dest.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Coords: {dest.stopPosition.x}, {dest.stopPosition.z}</div>
+                    <div className="font-semibold text-slate-200 group-hover:text-white transition-colors">{dest.name}</div>
+                    <div className="text-xs text-slate-500 mt-0.5 font-mono">{dest.sector} // [{dest.stopPosition.x}, {dest.stopPosition.z}]</div>
                   </div>
-                  {currentPosition.id === dest.id && <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></div>}
+                  {currentPosition.id === dest.id && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_#00f0ff] animate-pulse"></div>
+                  )}
                 </button>
               ))}
+            </div>
+
+            {/* Quick Stats / Info Footer */}
+            <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 text-xs font-mono text-slate-400 flex items-center justify-between">
+              <span>PLOTS: 32 REGISTERED</span>
+              <span>PARKS: 8 GROVES</span>
             </div>
           </div>
           
           {/* --- 3D Viewport --- */}
-          <div className="col-span-3 bg-[#0a0a15] relative w-full h-full overflow-hidden select-none">
+          <div className="col-span-3 bg-[#050811] relative w-full h-full overflow-hidden select-none">
             <canvas 
               ref={canvasRef} 
               onContextMenu={(e) => e.preventDefault()}
               className={`w-full h-full block ${isNavigating ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`} 
             />
             
-            {/* Overlay UI: Status Badge & Camera Controls */}
-            <div className="absolute top-6 left-6 flex flex-col gap-2 pointer-events-none z-10">
-              <div className="flex items-center gap-2">
-                <div className="bg-slate-900/80 backdrop-blur px-3.5 py-2 rounded-lg border border-slate-700 text-slate-200 text-xs font-mono shadow-lg flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-emerald-500 animate-pulse' : 'bg-blue-400'}`}></span>
-                  <span>SYS.STATUS: {isNavigating ? 'NAVIGATING' : 'IDLE'}</span>
+            {/* Overlay UI: Status & Camera Mode Switcher */}
+            <div className="absolute top-6 left-6 flex flex-col gap-2 z-10">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/80 text-slate-200 text-xs font-mono shadow-xl flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f0ff]' : 'bg-emerald-400'}`}></span>
+                  <span>SYS: {isNavigating ? 'AUTONOMOUS TRANSIT' : 'DOCKED // IDLE'}</span>
                 </div>
-                
+
+                {/* Top-Down Map View Button */}
+                <button
+                  onClick={setCameraTopDown}
+                  disabled={isNavigating}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-mono shadow-xl flex items-center gap-1.5 transition-all
+                    ${viewMode === 'topDown' 
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' 
+                      : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}
+                    disabled:opacity-40 disabled:cursor-not-allowed`}
+                  title="Switch to Top-Down City Map Overview"
+                >
+                  <MapIcon className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>TOP-DOWN MAP</span>
+                </button>
+
+                {/* Focus Car Button */}
+                <button
+                  onClick={setCameraFocusCar}
+                  disabled={isNavigating}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-mono shadow-xl flex items-center gap-1.5 transition-all
+                    ${viewMode === 'follow' 
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' 
+                      : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'}
+                    disabled:opacity-40 disabled:cursor-not-allowed`}
+                  title="Focus camera closely on the autonomous car"
+                >
+                  <Car className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>FOCUS CAR</span>
+                </button>
+
                 <button
                   onClick={handleResetView}
                   disabled={isNavigating}
-                  className="pointer-events-auto bg-slate-900/80 hover:bg-slate-800 backdrop-blur px-3 py-2 rounded-lg border border-slate-700 hover:border-blue-500/50 text-slate-300 hover:text-white text-xs font-mono shadow-lg flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95"
-                  title="Reset viewpoint to default camera angle"
+                  className="bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md p-1.5 rounded-lg border border-slate-700/80 hover:border-cyan-500/50 text-slate-300 hover:text-white text-xs font-mono shadow-xl flex items-center transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Toggle view mode"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-blue-400 transition-transform group-hover:-rotate-45" />
-                  <span>RESET VIEW</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
                 </button>
               </div>
 
-              <div className="text-[11px] text-slate-400/80 font-mono bg-slate-900/60 backdrop-blur px-2.5 py-1 rounded border border-slate-800/80 w-fit pointer-events-none flex items-center gap-1.5 shadow">
+              <div className="text-[11px] text-slate-400/90 font-mono bg-slate-900/70 backdrop-blur px-2.5 py-1 rounded border border-slate-800/80 w-fit pointer-events-none flex items-center gap-1.5 shadow">
                 <span>🖱️ Click & drag to rotate • Scroll to zoom</span>
               </div>
             </div>
 
             {/* Circular Minimap Overlay (Top-Right) */}
-            <div className="absolute top-6 right-6 w-48 h-48 rounded-full overflow-hidden border-2 border-slate-700 shadow-2xl bg-[#0f1419]">
+            <div className="absolute top-6 right-6 w-48 h-48 rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-[#050811]">
               <VectorMap
                 currentPosition={currentPosition}
                 destinations={DESTINATIONS}
-                roads={ROADS}
                 isNavigating={isNavigating}
                 navigationProgress={navigationProgress}
                 currentRoute={currentRoute}
+                plots={cityPlots.current}
               />
             </div>
 
-            {/* Status Pill (Bottom-Center) */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-6 py-3 rounded-full border border-slate-700 flex items-center gap-3 shadow-xl pointer-events-none">
-              <div className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></div>
-              <span className="text-slate-200 text-sm font-medium">
-                {isNavigating ? "Autonomous Mode Active..." : "Vehicle Parked"}
+            {/* Bottom Status Pill */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-6 py-2.5 rounded-full border border-slate-700/80 flex items-center gap-3 shadow-2xl pointer-events-none">
+              <div className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f0ff]' : 'bg-emerald-400'}`}></div>
+              <span className="text-slate-200 text-xs font-mono tracking-wider">
+                {isNavigating ? "AUTONOMOUS PATHFINDING // ACTIVE" : `DOCKED AT ${currentPosition.name.toUpperCase()}`}
               </span>
             </div>
           </div>
@@ -1550,61 +1971,61 @@ about: {
         </div>
       </div>
       
-      {/* Pop-up Modal */}
+      {/* Pop-up Modal for Destination / Blog Posts */}
       {selectedDestination && !isNavigating && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={closeModal}>
-    <div className="bg-slate-900 rounded-2xl max-w-5xl w-full max-h-[85vh] border border-slate-700 shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-      
-      <div className="flex justify-between items-start p-8 pb-6 border-b border-slate-800">
-        <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-          <selectedDestination.icon className="w-8 h-8" style={{ color: selectedDestination.color }} />
-          {selectedDestination.id === 'blog' ? 'Blog Tower' : renderContent().title}
-        </h2>
-        <button onClick={closeModal} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
-
-      <div className="overflow-y-auto p-8 flex-1">
-        {selectedDestination.id === 'blog' ? (
-          selectedBlogPost ? (
-            <div>
-              <button onClick={() => setSelectedBlogPost(null)} className="mb-6 text-blue-400 hover:text-blue-300 flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to all posts
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={closeModal}>
+          <div className="bg-slate-900 rounded-2xl max-w-5xl w-full max-h-[85vh] border border-slate-700 shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            
+            <div className="flex justify-between items-start p-8 pb-6 border-b border-slate-800">
+              <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                <selectedDestination.icon className="w-8 h-8" style={{ color: selectedDestination.color }} />
+                {selectedDestination.id === 'blog' ? 'Blog Tower' : renderContent()?.title}
+              </h2>
+              <button onClick={closeModal} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
-              <h3 className="text-2xl font-bold text-white mb-2">{selectedBlogPost.title}</h3>
-              <p className="text-gray-400 text-sm mb-6">{selectedBlogPost.date}</p>
-              {selectedBlogPost.content}
             </div>
-          ) : (
-            <div className="space-y-4">
-              {blogPosts.map(post => (
-                <div key={post.id} onClick={() => setSelectedBlogPost(post)}
-                  className="p-6 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-blue-500/50 hover:bg-slate-800 transition-all cursor-pointer group">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400">{post.title}</h3>
-                    <svg className="w-5 h-5 text-gray-500 group-hover:text-blue-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
+
+            <div className="overflow-y-auto p-8 flex-1">
+              {selectedDestination.id === 'blog' ? (
+                selectedBlogPost ? (
+                  <div>
+                    <button onClick={() => setSelectedBlogPost(null)} className="mb-6 text-cyan-400 hover:text-cyan-300 flex items-center gap-2 font-medium">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back to all posts
+                    </button>
+                    <h3 className="text-2xl font-bold text-white mb-2">{selectedBlogPost.title}</h3>
+                    <p className="text-gray-400 text-sm mb-6 font-mono">{selectedBlogPost.date}</p>
+                    {selectedBlogPost.content}
                   </div>
-                  <p className="text-gray-400 text-sm mb-3">{post.date}</p>
-                  <p className="text-gray-300">{post.preview}</p>
+                ) : (
+                  <div className="space-y-4">
+                    {blogPosts.map(post => (
+                      <div key={post.id} onClick={() => setSelectedBlogPost(post)}
+                        className="p-6 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800 transition-all cursor-pointer group">
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="text-xl font-bold text-white group-hover:text-cyan-400">{post.title}</h3>
+                          <svg className="w-5 h-5 text-gray-500 group-hover:text-cyan-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        <p className="text-gray-400 text-sm mb-3 font-mono">{post.date}</p>
+                        <p className="text-gray-300">{post.preview}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="prose prose-invert max-w-none">
+                  {renderContent()?.body}
                 </div>
-              ))}
+              )}
             </div>
-          )
-        ) : (
-          <div className="prose prose-invert max-w-none">
-            {renderContent().body}
           </div>
-        )}
-      </div>
-    </div>
-    </div>
-    )}
+        </div>
+      )}
     </div>
   );
 };

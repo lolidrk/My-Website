@@ -28,63 +28,63 @@ export interface DestinationItem {
   email?: string;
 }
 
-// 4 Sector Destinations (Spaced far apart across the city)
+// 4 Destinations mapped to Indiranagar Arterials (100 Feet Rd & 80 Feet Rd)
 const DESTINATIONS: DestinationItem[] = [
   { 
     id: 'home', 
     name: 'Home Base', 
-    sector: 'NORTH SECTOR',
+    sector: '100 FT RD // CMH JCT',
     icon: Home, 
-    coords: { lat: 12.9698, lng: 77.7500 },
-    position3D: { x: 0, z: -145 },
-    stopPosition: { x: 0, z: -130 },
-    defaultHeading: Math.PI / 2, // Facing East along North Avenue
+    coords: { lat: 12.9784, lng: 77.6408 },
+    position3D: { x: -58, z: -105 },
+    stopPosition: { x: -80, z: -105 },
+    defaultHeading: Math.PI, // Facing South down 100 Feet Road
     color: '#00f0ff',
     buildingColor: 0x00f0ff,
     height: 18,
-    camOffset: { x: 0, y: 26, z: 38 }
+    camOffset: { x: -40, y: 24, z: -80 }
   },
   { 
     id: 'publications', 
     name: 'Publications Hub', 
-    sector: 'EAST SECTOR',
+    sector: '80 FT RD // RESEARCH LAB',
     icon: FileText, 
-    coords: { lat: 12.9850, lng: 77.7300 },
-    position3D: { x: 145, z: 0 },
-    stopPosition: { x: 130, z: 0 },
-    defaultHeading: Math.PI, // Facing South along East Avenue
+    coords: { lat: 12.9730, lng: 77.6520 },
+    position3D: { x: 104, z: -10 },
+    stopPosition: { x: 80, z: -10 },
+    defaultHeading: Math.PI, // Facing South down 80 Feet Road
     color: '#10b981',
     buildingColor: 0x10b981,
     height: 26,
-    camOffset: { x: -38, y: 28, z: 0 }
+    camOffset: { x: 40, y: 28, z: -10 }
   },
   { 
     id: 'blog', 
     name: 'Blog Tower', 
-    sector: 'SOUTH SECTOR',
+    sector: '100 FT RD // 12TH MAIN',
     icon: BookOpen, 
-    coords: { lat: 12.9520, lng: 77.7650 },
-    position3D: { x: 0, z: 145 },
-    stopPosition: { x: 0, z: 130 },
-    defaultHeading: -Math.PI / 2, // Facing West along South Avenue
+    coords: { lat: 12.9640, lng: 77.6415 },
+    position3D: { x: -58, z: 105 },
+    stopPosition: { x: -80, z: 105 },
+    defaultHeading: Math.PI, // Facing South down 100 Feet Road
     color: '#f59e0b',
     buildingColor: 0xf59e0b,
     height: 38,
-    camOffset: { x: 0, y: 32, z: -42 }
+    camOffset: { x: -40, y: 32, z: 75 }
   },
   { 
     id: 'about', 
     name: 'About Plaza', 
-    sector: 'WEST SECTOR',
+    sector: '100 FT RD // DEFENCE COLONY',
     icon: User, 
-    coords: { lat: 12.9600, lng: 77.7400 },
-    position3D: { x: -145, z: 0 },
-    stopPosition: { x: -130, z: 0 },
-    defaultHeading: 0, // Facing North along West Avenue
+    coords: { lat: 12.9710, lng: 77.6395 },
+    position3D: { x: -104, z: 45 },
+    stopPosition: { x: -80, z: 45 },
+    defaultHeading: Math.PI, // Facing South down 100 Feet Road
     color: '#8b5cf6',
     buildingColor: 0x8b5cf6,
     height: 16,
-    camOffset: { x: 38, y: 26, z: 0 },
+    camOffset: { x: -45, y: 24, z: 45 },
     email: 'kalyanikulkarni2002@gmail.com'
   },
 ];
@@ -108,127 +108,152 @@ const generateCornerArc = (
   return pts;
 };
 
-// Route calculator across the city grid
-const CORNER_R = 12;
-const CORNER_OFFSET = 118; // 130 - 12
-
+// Route calculator across Indiranagar Grid (100 Ft Rd, 80 Ft Rd, 2nd Main, 6th Main)
 const computeCityRoute = (fromId: string, toId: string): Waypoint[] => {
   if (fromId === toId) return [];
 
-  // Corner arcs
-  const trCorner = generateCornerArc(CORNER_OFFSET, -CORNER_OFFSET, CORNER_R, -Math.PI / 2, 0); // NE
-  const brCorner = generateCornerArc(CORNER_OFFSET, CORNER_OFFSET, CORNER_R, 0, Math.PI / 2); // SE
-  const blCorner = generateCornerArc(-CORNER_OFFSET, CORNER_OFFSET, CORNER_R, Math.PI / 2, Math.PI); // SW
-  const tlCorner = generateCornerArc(-CORNER_OFFSET, -CORNER_OFFSET, CORNER_R, Math.PI, 3 * Math.PI / 2); // NW
+  // Corner arcs with radius R=8
+  // 100 Ft Rd (-80) & 2nd Main (-80)
+  const turn100To2ndMainEast = generateCornerArc(-72, -88, 8, Math.PI, Math.PI / 2); // S to E
+  const turn2ndMainTo100North = generateCornerArc(-72, -88, 8, Math.PI / 2, Math.PI); // W to N
+
+  // 80 Ft Rd (80) & 2nd Main (-80)
+  const turn2ndMainTo80South = generateCornerArc(72, -72, 8, -Math.PI / 2, 0); // E to S
+  const turn80To2ndMainWest = generateCornerArc(72, -72, 8, 0, -Math.PI / 2); // N to W
+
+  // 100 Ft Rd (-80) & 6th Main (15)
+  const turn100To6thMainEast = generateCornerArc(-72, 23, 8, Math.PI, 3 * Math.PI / 2); // N to E
+  const turn6thMainTo100South = generateCornerArc(-72, 23, 8, 3 * Math.PI / 2, Math.PI); // W to S
+
+  // 80 Ft Rd (80) & 6th Main (15)
+  const turn6thMainTo80North = generateCornerArc(72, 7, 8, Math.PI / 2, 0); // E to N
+  const turn80To6thMainWest = generateCornerArc(72, 7, 8, 0, Math.PI / 2); // S to W
 
   const routes: Record<string, Waypoint[]> = {
-    // 1. Home -> Publications (via East Avenue)
-    'home->publications': [
-      { x: 0, z: -130 },
-      { x: CORNER_OFFSET, z: -130 },
-      ...trCorner,
-      { x: 130, z: -CORNER_OFFSET },
-      { x: 130, z: 0, heading: Math.PI }
-    ],
-    // 2. Home -> Blog (straight down Central Boulevard)
-    'home->blog': [
-      { x: 0, z: -130 },
-      { x: 0, z: -65 },
-      { x: 0, z: 0 },
-      { x: 0, z: 65 },
-      { x: 0, z: 130, heading: Math.PI }
-    ],
-    // 3. Home -> About (via West Avenue)
+    // 1. Home -> About (Straight South down 100 Feet Road)
     'home->about': [
-      { x: 0, z: -130 },
-      { x: -CORNER_OFFSET, z: -130 },
-      ...tlCorner.slice().reverse(),
-      { x: -130, z: -CORNER_OFFSET },
-      { x: -130, z: 0, heading: Math.PI }
+      { x: -80, z: -105 },
+      { x: -80, z: -80 },
+      { x: -80, z: 0 },
+      { x: -80, z: 45, heading: Math.PI }
     ],
-
-    // 4. Publications -> Blog (via South Avenue)
-    'publications->blog': [
-      { x: 130, z: 0 },
-      { x: 130, z: CORNER_OFFSET },
-      ...brCorner,
-      { x: CORNER_OFFSET, z: 130 },
-      { x: 0, z: 130, heading: -Math.PI / 2 }
-    ],
-    // 5. Publications -> About (straight across Central Boulevard)
-    'publications->about': [
-      { x: 130, z: 0 },
-      { x: 65, z: 0 },
-      { x: 0, z: 0 },
-      { x: -65, z: 0 },
-      { x: -130, z: 0, heading: -Math.PI / 2 }
-    ],
-    // 6. Publications -> Home (via North Avenue)
-    'publications->home': [
-      { x: 130, z: 0 },
-      { x: 130, z: -CORNER_OFFSET },
-      ...trCorner.slice().reverse(),
-      { x: CORNER_OFFSET, z: -130 },
-      { x: 0, z: -130, heading: -Math.PI / 2 }
-    ],
-
-    // 7. Blog -> About (via West Avenue)
-    'blog->about': [
-      { x: 0, z: 130 },
-      { x: -CORNER_OFFSET, z: 130 },
-      ...blCorner,
-      { x: -130, z: CORNER_OFFSET },
-      { x: -130, z: 0, heading: 0 }
-    ],
-    // 8. Blog -> Home (straight North down Central Boulevard)
-    'blog->home': [
-      { x: 0, z: 130 },
-      { x: 0, z: 65 },
-      { x: 0, z: 0 },
-      { x: 0, z: -65 },
-      { x: 0, z: -130, heading: 0 }
-    ],
-    // 9. Blog -> Publications (via East Avenue)
-    'blog->publications': [
-      { x: 0, z: 130 },
-      { x: CORNER_OFFSET, z: 130 },
-      ...brCorner.slice().reverse(),
-      { x: 130, z: CORNER_OFFSET },
-      { x: 130, z: 0, heading: 0 }
-    ],
-
-    // 10. About -> Home (via North Avenue)
-    'about->home': [
-      { x: -130, z: 0 },
-      { x: -130, z: -CORNER_OFFSET },
-      ...tlCorner,
-      { x: -CORNER_OFFSET, z: -130 },
-      { x: 0, z: -130, heading: Math.PI / 2 }
-    ],
-    // 11. About -> Publications (straight East across Central Boulevard)
-    'about->publications': [
-      { x: -130, z: 0 },
-      { x: -65, z: 0 },
-      { x: 0, z: 0 },
-      { x: 65, z: 0 },
-      { x: 130, z: 0, heading: Math.PI / 2 }
-    ],
-    // 12. About -> Blog (via South Avenue)
+    // 2. About -> Blog (Straight South down 100 Feet Road)
     'about->blog': [
-      { x: -130, z: 0 },
-      { x: -130, z: CORNER_OFFSET },
-      ...blCorner.slice().reverse(),
-      { x: -CORNER_OFFSET, z: 130 },
-      { x: 0, z: 130, heading: Math.PI / 2 }
+      { x: -80, z: 45 },
+      { x: -80, z: 75 },
+      { x: -80, z: 105, heading: Math.PI }
+    ],
+    // 3. Home -> Blog (Straight South down 100 Feet Road)
+    'home->blog': [
+      { x: -80, z: -105 },
+      { x: -80, z: -40 },
+      { x: -80, z: 45 },
+      { x: -80, z: 105, heading: Math.PI }
+    ],
+
+    // 4. Blog -> About (Straight North up 100 Feet Road)
+    'blog->about': [
+      { x: -80, z: 105 },
+      { x: -80, z: 75 },
+      { x: -80, z: 45, heading: 0 }
+    ],
+    // 5. About -> Home (Straight North up 100 Feet Road)
+    'about->home': [
+      { x: -80, z: 45 },
+      { x: -80, z: -40 },
+      { x: -80, z: -105, heading: 0 }
+    ],
+    // 6. Blog -> Home (Straight North up 100 Feet Road)
+    'blog->home': [
+      { x: -80, z: 105 },
+      { x: -80, z: 45 },
+      { x: -80, z: -40 },
+      { x: -80, z: -105, heading: 0 }
+    ],
+
+    // 7. Home -> Publications (100 Ft Rd -> 2nd Main across Defence Colony Park -> 80 Ft Rd)
+    'home->publications': [
+      { x: -80, z: -105 },
+      { x: -80, z: -88 },
+      ...turn100To2ndMainEast,
+      { x: -72, z: -80 },
+      { x: 0, z: -80 }, // Passing north of Defence Colony Park
+      { x: 72, z: -80 },
+      ...turn2ndMainTo80South,
+      { x: 80, z: -72 },
+      { x: 80, z: -10, heading: Math.PI }
+    ],
+    // 8. Publications -> Home (80 Ft Rd -> 2nd Main across Defence Colony Park -> 100 Ft Rd)
+    'publications->home': [
+      { x: 80, z: -10 },
+      { x: 80, z: -72 },
+      ...turn80To2ndMainWest,
+      { x: 72, z: -80 },
+      { x: 0, z: -80 }, // Passing north of Defence Colony Park
+      { x: -72, z: -80 },
+      ...turn2ndMainTo100North,
+      { x: -80, z: -88 },
+      { x: -80, z: -105, heading: 0 }
+    ],
+
+    // 9. About -> Publications (100 Ft Rd -> 6th Main -> 80 Ft Rd)
+    'about->publications': [
+      { x: -80, z: 45 },
+      { x: -80, z: 23 },
+      ...turn100To6thMainEast,
+      { x: -72, z: 15 },
+      { x: 0, z: 15 }, // Driving across 6th Main
+      { x: 72, z: 15 },
+      ...turn6thMainTo80North,
+      { x: 80, z: 7 },
+      { x: 80, z: -10, heading: 0 }
+    ],
+    // 10. Publications -> About (80 Ft Rd -> 6th Main -> 100 Ft Rd)
+    'publications->about': [
+      { x: 80, z: -10 },
+      { x: 80, z: 7 },
+      ...turn80To6thMainWest,
+      { x: 72, z: 15 },
+      { x: 0, z: 15 }, // Driving across 6th Main
+      { x: -72, z: 15 },
+      ...turn6thMainTo100South,
+      { x: -80, z: 23 },
+      { x: -80, z: 45, heading: Math.PI }
+    ],
+
+    // 11. Blog -> Publications (100 Ft Rd North -> 6th Main East -> 80 Ft Rd)
+    'blog->publications': [
+      { x: -80, z: 105 },
+      { x: -80, z: 23 },
+      ...turn100To6thMainEast,
+      { x: -72, z: 15 },
+      { x: 0, z: 15 },
+      { x: 72, z: 15 },
+      ...turn6thMainTo80North,
+      { x: 80, z: 7 },
+      { x: 80, z: -10, heading: 0 }
+    ],
+    // 12. Publications -> Blog (80 Ft Rd South -> 6th Main West -> 100 Ft Rd South)
+    'publications->blog': [
+      { x: 80, z: -10 },
+      { x: 80, z: 7 },
+      ...turn80To6thMainWest,
+      { x: 72, z: 15 },
+      { x: 0, z: 15 },
+      { x: -72, z: 15 },
+      ...turn6thMainTo100South,
+      { x: -80, z: 23 },
+      { x: -80, z: 105, heading: Math.PI }
     ],
   };
 
   return routes[`${fromId}->${toId}`] || [];
 };
 
-// --- Plots of Land Layout ---
+// --- Plots of Land Layout (Strictly inside block corridors - NO road overlap) ---
 export interface LandPlot {
   id: string;
+  name?: string;
   minX: number;
   maxX: number;
   minZ: number;
@@ -237,98 +262,124 @@ export interface LandPlot {
   heroId?: string;
 }
 
-// Generate the urban plot grid (matching Picture 2)
+// Generate the Indiranagar urban plot grid
 const generateLandPlots = (): LandPlot[] => {
   const plots: LandPlot[] = [];
 
-  // 1. Hero destination plots
+  // Column boundaries (X corridors for roads at X = -130, -80, -40, 0, 40, 80, 130)
+  // Col 1: [-125, -86], Col 2: [-74, -45], Col 3: [-35, -5], Col 4: [5, 35], Col 5: [45, 74], Col 6: [86, 125]
+  // Row boundaries (Z corridors for roads at Z = -130, -80, -35, 15, 75, 130)
+  // Row 1: [-125, -85], Row 2: [-75, -40], Row 3: [-30, 10], Row 4: [20, 70], Row 5: [80, 125]
+
+  // 1. HERO DESTINATION PLOTS
   plots.push({
     id: 'hero_home',
-    minX: -35, maxX: 35,
-    minZ: -160, maxZ: -135,
+    name: 'Home Base Terminal',
+    minX: -74, maxX: -45,
+    minZ: -125, maxZ: -85,
     type: 'hero',
     heroId: 'home'
   });
   plots.push({
     id: 'hero_publications',
-    minX: 135, maxX: 160,
-    minZ: -35, maxZ: 35,
+    name: 'Publications Hub Campus',
+    minX: 86, maxX: 125,
+    minZ: -30, maxZ: 10,
     type: 'hero',
     heroId: 'publications'
   });
   plots.push({
     id: 'hero_blog',
-    minX: -35, maxX: 35,
-    minZ: 135, maxZ: 160,
+    name: 'Blog Tower Plaza',
+    minX: -74, maxX: -45,
+    minZ: 80, maxZ: 125,
     type: 'hero',
     heroId: 'blog'
   });
   plots.push({
     id: 'hero_about',
-    minX: -160, maxX: -135,
-    minZ: -35, maxZ: 35,
+    name: 'About Plaza Pavilion',
+    minX: -125, maxX: -86,
+    minZ: 20, maxZ: 70,
     type: 'hero',
     heroId: 'about'
   });
 
-  // 2. Central Park (Grand park plot in center)
+  // 2. PARKS & GREEN SPACES (Directly inspired by Indiranagar OpenStreetMap)
+  // A. Defence Colony Park (Large prominent park in Row 2, spanning Col 3 & 4)
   plots.push({
-    id: 'park_center_nw',
-    minX: -55, maxX: -6,
-    minZ: -55, maxZ: -6,
+    id: 'park_defence_colony',
+    name: 'Defence Colony Park',
+    minX: -35, maxX: 35,
+    minZ: -75, maxZ: -40,
     type: 'park'
   });
+  // B. Defence Colony Playground & Children's Park (Row 3, Col 4)
   plots.push({
-    id: 'park_center_se',
-    minX: 6, maxX: 55,
-    minZ: 6, maxZ: 55,
+    id: 'park_defence_playground',
+    name: "Defence Colony Playground",
+    minX: 5, maxX: 35,
+    minZ: -30, maxZ: 10,
+    type: 'park'
+  });
+  // C. Indiranagar Club Park (Row 4, Col 3)
+  plots.push({
+    id: 'park_indiranagar_club',
+    name: 'Indiranagar Club Park',
+    minX: -35, maxX: -5,
+    minZ: 20, maxZ: 70,
+    type: 'park'
+  });
+  // D. BDA Public Park (Row 3, Col 1 - West of 100 Feet Road)
+  plots.push({
+    id: 'park_bda',
+    name: 'BDA Public Park',
+    minX: -125, maxX: -86,
+    minZ: -30, maxZ: 10,
+    type: 'park'
+  });
+  // E. Eastside Green Park (Row 2, Col 6 - East of 80 Feet Road)
+  plots.push({
+    id: 'park_eastside',
+    name: 'Eastside Green Reserve',
+    minX: 86, maxX: 125,
+    minZ: -75, maxZ: -40,
     type: 'park'
   });
 
-  // 3. Tree plots in perimeter quadrants (Picture 1 & Picture 2 style)
-  plots.push({ id: 'park_nw', minX: -125, maxX: -72, minZ: -125, maxZ: -72, type: 'park' });
-  plots.push({ id: 'park_ne', minX: 72, maxX: 125, minZ: -125, maxZ: -72, type: 'park' });
-  plots.push({ id: 'park_sw', minX: -125, maxX: -72, minZ: 72, maxZ: 125, type: 'park' });
-  plots.push({ id: 'park_se', minX: 72, maxX: 125, minZ: 72, maxZ: 125, type: 'park' });
-  plots.push({ id: 'park_mid_w', minX: -125, maxX: -72, minZ: -28, maxZ: 28, type: 'park' });
-  plots.push({ id: 'park_mid_e', minX: 72, maxX: 125, minZ: -28, maxZ: 28, type: 'park' });
-
-  // 4. Wireframe Skyscraper & Commercial Plots (Picture 1 style)
+  // 3. WIREFRAME CYBERPUNK SKYSCRAPERS & COMMERCIAL PLOTS (Picture 1 style)
   // Cantilever Towers
-  plots.push({ id: 'bld_cantilever_1', minX: -58, maxX: -8, minZ: -125, maxZ: -72, type: 'cantilever' });
-  plots.push({ id: 'bld_cantilever_2', minX: 8, maxX: 58, minZ: 72, maxZ: 125, type: 'cantilever' });
-  plots.push({ id: 'bld_cantilever_3', minX: -155, maxX: -136, minZ: -125, maxZ: -72, type: 'cantilever' });
+  plots.push({ id: 'bld_cant_1', minX: -125, maxX: -86, minZ: -125, maxZ: -85, type: 'cantilever' });
+  plots.push({ id: 'bld_cant_2', minX: 45, maxX: 74, minZ: 20, maxZ: 70, type: 'cantilever' });
+  plots.push({ id: 'bld_cant_3', minX: 86, maxX: 125, minZ: -125, maxZ: -85, type: 'cantilever' });
 
   // Stepped Setback Towers
-  plots.push({ id: 'bld_stepped_1', minX: 8, maxX: 58, minZ: -125, maxZ: -72, type: 'stepped' });
-  plots.push({ id: 'bld_stepped_2', minX: -58, maxX: -8, minZ: 72, maxZ: 125, type: 'stepped' });
-  plots.push({ id: 'bld_stepped_3', minX: 136, maxX: 155, minZ: 72, maxZ: 125, type: 'stepped' });
+  plots.push({ id: 'bld_step_1', minX: -35, maxX: -5, minZ: -125, maxZ: -85, type: 'stepped' });
+  plots.push({ id: 'bld_step_2', minX: 45, maxX: 74, minZ: -75, maxZ: -40, type: 'stepped' });
+  plots.push({ id: 'bld_step_3', minX: -74, maxX: -45, minZ: 20, maxZ: 70, type: 'stepped' });
+  plots.push({ id: 'bld_step_4', minX: 86, maxX: 125, minZ: 80, maxZ: 125, type: 'stepped' });
 
-  // Slanted Wedge Roof Towers
-  plots.push({ id: 'bld_wedge_1', minX: -55, maxX: -8, minZ: 8, maxZ: 55, type: 'wedge' });
-  plots.push({ id: 'bld_wedge_2', minX: 8, maxX: 55, minZ: -55, maxZ: -8, type: 'wedge' });
-  plots.push({ id: 'bld_wedge_3', minX: 136, maxX: 155, minZ: -125, maxZ: -72, type: 'wedge' });
+  // Slanted Wedge Towers
+  plots.push({ id: 'bld_wedge_1', minX: 5, maxX: 35, minZ: -125, maxZ: -85, type: 'wedge' });
+  plots.push({ id: 'bld_wedge_2', minX: -74, maxX: -45, minZ: -30, maxZ: 10, type: 'wedge' });
+  plots.push({ id: 'bld_wedge_3', minX: 45, maxX: 74, minZ: 80, maxZ: 125, type: 'wedge' });
 
   // Spire Megatowers
-  plots.push({ id: 'bld_spire_1', minX: -155, maxX: -136, minZ: 72, maxZ: 125, type: 'spire' });
-  plots.push({ id: 'bld_spire_2', minX: 136, maxX: 155, minZ: -28, maxZ: 28, type: 'spire' });
+  plots.push({ id: 'bld_spire_1', minX: 45, maxX: 74, minZ: -125, maxZ: -85, type: 'spire' });
+  plots.push({ id: 'bld_spire_2', minX: 86, maxX: 125, minZ: 20, maxZ: 70, type: 'spire' });
 
-  // Commercial Mid-Rise & Matrix Blocks
-  plots.push({ id: 'bld_comm_1', minX: -155, maxX: -136, minZ: -155, maxZ: -136, type: 'commercial' });
-  plots.push({ id: 'bld_comm_2', minX: 136, maxX: 155, minZ: -155, maxZ: -136, type: 'commercial' });
-  plots.push({ id: 'bld_comm_3', minX: -155, maxX: -136, minZ: 136, maxZ: 155, type: 'commercial' });
-  plots.push({ id: 'bld_comm_4', minX: 136, maxX: 155, minZ: 136, maxZ: 155, type: 'commercial' });
-
-  // Lowrise Complexes
-  plots.push({ id: 'bld_low_1', minX: -125, maxX: -72, minZ: -155, maxZ: -136, type: 'lowrise' });
-  plots.push({ id: 'bld_low_2', minX: 72, maxX: 125, minZ: -155, maxZ: -136, type: 'lowrise' });
-  plots.push({ id: 'bld_low_3', minX: -125, maxX: -72, minZ: 136, maxZ: 155, type: 'lowrise' });
-  plots.push({ id: 'bld_low_4', minX: 72, maxX: 125, minZ: 136, maxZ: 155, type: 'lowrise' });
+  // Commercial Matrix Blocks with Glowing Windows
+  plots.push({ id: 'bld_comm_1', minX: -125, maxX: -86, minZ: -75, maxZ: -40, type: 'commercial' });
+  plots.push({ id: 'bld_comm_2', minX: -35, maxX: -5, minZ: -30, maxZ: 10, type: 'commercial' });
+  plots.push({ id: 'bld_comm_3', minX: 5, maxX: 35, minZ: 20, maxZ: 70, type: 'commercial' });
+  plots.push({ id: 'bld_comm_4', minX: -125, maxX: -86, minZ: 80, maxZ: 125, type: 'commercial' });
+  plots.push({ id: 'bld_comm_5', minX: -35, maxX: -5, minZ: 80, maxZ: 125, type: 'commercial' });
+  plots.push({ id: 'bld_comm_6', minX: 5, maxX: 35, minZ: 80, maxZ: 125, type: 'commercial' });
 
   return plots;
 };
 
-// --- Vector 2D Map Component (Shows Plots & Road Network) ---
+// --- Vector 2D Map Component (Indiranagar OpenStreetMap Layout) ---
 interface VectorMapProps {
   currentPosition: DestinationItem;
   destinations: DestinationItem[];
@@ -342,15 +393,15 @@ interface VectorMapProps {
 }
 
 const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, isNavigating, navigationProgress, currentRoute, plots }) => {
-  const viewBoxSize = 340;
+  const viewBoxSize = 320;
   const offset = viewBoxSize / 2;
 
   const getCarPosition = () => {
     if (!isNavigating || !currentRoute.path || currentRoute.path.length === 0) {
-      return currentPosition.stopPosition || { x: 0, z: -130 };
+      return currentPosition.stopPosition || { x: -80, z: -105 };
     }
     const totalSegments = currentRoute.path.length - 1;
-    if (totalSegments <= 0) return currentPosition.stopPosition || { x: 0, z: -130 };
+    if (totalSegments <= 0) return currentPosition.stopPosition || { x: -80, z: -105 };
 
     const progressPerSegment = 1 / totalSegments;
     const currentSegmentIndex = Math.min(
@@ -361,7 +412,7 @@ const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, is
 
     const p1 = currentRoute.path[currentSegmentIndex];
     const p2 = currentRoute.path[currentSegmentIndex + 1];
-    if (!p1 || !p2) return currentPosition.stopPosition || { x: 0, z: -130 };
+    if (!p1 || !p2) return currentPosition.stopPosition || { x: -80, z: -105 };
 
     return {
       x: p1.x + (p2.x - p1.x) * segmentProgress,
@@ -385,22 +436,12 @@ const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, is
 
   return (
     <div className="w-full h-full bg-[#050811] relative overflow-hidden select-none">
-      {/* Background Matrix Grid */}
-      <svg className="absolute inset-0 w-full h-full opacity-20" width="100%" height="100%">
-        <defs>
-          <pattern id="miniGrid" width="16" height="16" patternUnits="userSpaceOnUse">
-            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#22c55e" strokeWidth="0.4"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#miniGrid)" />
-      </svg>
-
       <svg 
         viewBox={`-${offset} -${offset} ${viewBoxSize} ${viewBoxSize}`} 
         className="w-full h-full"
         style={{ padding: '8px' }}
       >
-        {/* Render Plots of Land (Picture 2 Cadastral Style) */}
+        {/* Render Plots of Land (Cadastral Blocks) */}
         {plots && plots.map((p: LandPlot) => (
           <g key={p.id}>
             <rect
@@ -408,39 +449,66 @@ const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, is
               y={p.minZ}
               width={p.maxX - p.minX}
               height={p.maxZ - p.minZ}
-              fill={p.type === 'park' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(10, 16, 30, 0.7)'}
+              fill={p.type === 'park' ? 'rgba(16, 185, 129, 0.16)' : 'rgba(8, 14, 26, 0.75)'}
               stroke={p.type === 'park' ? '#10b981' : '#22c55e'}
-              strokeWidth={p.type === 'park' ? 1.2 : 0.8}
+              strokeWidth={p.type === 'park' ? 1.4 : 0.75}
               strokeOpacity={0.65}
               rx={2}
             />
             {p.type === 'park' && (
-              <circle 
-                cx={(p.minX + p.maxX) / 2} 
-                cy={(p.minZ + p.maxZ) / 2} 
-                r={2.5} 
-                fill="#10b981" 
-                opacity={0.8} 
-              />
+              <text 
+                x={(p.minX + p.maxX) / 2} 
+                y={(p.minZ + p.maxZ) / 2 + 2} 
+                textAnchor="middle" 
+                fill="#34d399" 
+                fontSize="5" 
+                fontFamily="monospace"
+                fontWeight="bold"
+                opacity={0.8}
+              >
+                PARK
+              </text>
             )}
           </g>
         ))}
 
-        {/* Major Road Avenues (North, East, South, West, and Central Cross) */}
-        {/* Outer Loop */}
-        <rect 
-          x="-130" y="-130" width="260" height="260" rx="12" ry="12"
-          fill="none" stroke="#00ff66" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.8" 
-        />
-        {/* Central North-South Boulevard */}
-        <line x1="0" y1="-130" x2="0" y2="130" stroke="#00ff66" strokeWidth="1" strokeDasharray="3 3" opacity="0.7"/>
-        {/* Central East-West Boulevard */}
-        <line x1="-130" y1="0" x2="130" y2="0" stroke="#00ff66" strokeWidth="1" strokeDasharray="3 3" opacity="0.7"/>
-        {/* Intermediate grid roads */}
-        <line x1="-65" y1="-130" x2="-65" y2="130" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
-        <line x1="65" y1="-130" x2="65" y2="130" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
-        <line x1="-130" y1="-65" x2="130" y2="-65" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
-        <line x1="-130" y1="65" x2="130" y2="65" stroke="#22c55e" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4"/>
+        {/* Major Roads (Indiranagar Street Grid) */}
+        {/* 100 Feet Road (Major Western Commercial Boulevard) */}
+        <line x1="-80" y1="-130" x2="-80" y2="130" stroke="#00ff66" strokeWidth="2.5" opacity="0.9"/>
+        <line x1="-80" y1="-130" x2="-80" y2="130" stroke="#ffffff" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.7"/>
+
+        {/* 80 Feet Road (Major Eastern Boulevard) */}
+        <line x1="80" y1="-130" x2="80" y2="130" stroke="#00ff66" strokeWidth="2.5" opacity="0.9"/>
+        <line x1="80" y1="-130" x2="80" y2="130" stroke="#ffffff" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.7"/>
+
+        {/* CMH Road (North Arterial) */}
+        <line x1="-130" y1="-130" x2="130" y2="-130" stroke="#00ff66" strokeWidth="2" opacity="0.8"/>
+        {/* 12th Main Road (South Arterial) */}
+        <line x1="-130" y1="130" x2="130" y2="130" stroke="#00ff66" strokeWidth="2" opacity="0.8"/>
+
+        {/* Main Connecting Roads (Horizontal East-West) */}
+        {/* 2nd Main Road (Passing north of Defence Colony Park) */}
+        <line x1="-130" y1="-80" x2="130" y2="-80" stroke="#22c55e" strokeWidth="1.4" strokeDasharray="3 2" opacity="0.7"/>
+        {/* 5th Main Road */}
+        <line x1="-130" y1="-35" x2="130" y2="-35" stroke="#22c55e" strokeWidth="1.2" strokeDasharray="3 2" opacity="0.6"/>
+        {/* 6th Main Road */}
+        <line x1="-130" y1="15" x2="130" y2="15" stroke="#22c55e" strokeWidth="1.4" strokeDasharray="3 2" opacity="0.7"/>
+        {/* 9th Main Road */}
+        <line x1="-130" y1="75" x2="130" y2="75" stroke="#22c55e" strokeWidth="1.2" strokeDasharray="3 2" opacity="0.6"/>
+
+        {/* Cross Streets (Vertical North-South) */}
+        <line x1="-130" y1="-130" x2="-130" y2="130" stroke="#15803d" strokeWidth="1.2" opacity="0.5"/>
+        <line x1="-40" y1="-130" x2="-40" y2="130" stroke="#15803d" strokeWidth="1" strokeDasharray="2 2" opacity="0.5"/>
+        <line x1="0" y1="-130" x2="0" y2="130" stroke="#15803d" strokeWidth="1" strokeDasharray="2 2" opacity="0.5"/>
+        <line x1="40" y1="-130" x2="40" y2="130" stroke="#15803d" strokeWidth="1" strokeDasharray="2 2" opacity="0.5"/>
+        <line x1="130" y1="-130" x2="130" y2="130" stroke="#15803d" strokeWidth="1.2" opacity="0.5"/>
+
+        {/* Street Name Labels */}
+        <text x="-80" y="-134" textAnchor="middle" fill="#00ff66" fontSize="5" fontWeight="bold">100 FT RD</text>
+        <text x="80" y="-134" textAnchor="middle" fill="#00ff66" fontSize="5" fontWeight="bold">80 FT RD</text>
+        <text x="0" y="-133" textAnchor="middle" fill="#94a3b8" fontSize="4.5">CMH ROAD</text>
+        <text x="0" y="-83" textAnchor="middle" fill="#94a3b8" fontSize="4">2ND MAIN</text>
+        <text x="0" y="12" textAnchor="middle" fill="#94a3b8" fontSize="4">6TH MAIN</text>
 
         {/* Active Navigation Route */}
         {isNavigating && currentRoute.path && currentRoute.path.length > 1 && (
@@ -448,23 +516,23 @@ const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, is
             points={currentRoute.path.map((pt: Waypoint) => `${pt.x},${pt.z}`).join(' ')}
             fill="none"
             stroke="#00f0ff"
-            strokeWidth="3"
+            strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            opacity="0.9"
+            opacity="0.95"
           />
         )}
 
         {/* Destination Markers */}
         {destinations.map((dest: DestinationItem) => (
-          <g key={dest.id} transform={`translate(${dest.position3D.x}, ${dest.position3D.z})`}>
+          <g key={dest.id} transform={`translate(${dest.stopPosition.x}, ${dest.stopPosition.z})`}>
             <circle r="7" fill={dest.color} opacity="0.25" />
             <circle r="4" fill={dest.color} stroke="#ffffff" strokeWidth="1.2" />
             <text 
-              y={dest.position3D.z < -50 ? -9 : 14} 
+              y={dest.stopPosition.z < -50 ? -8 : 13} 
               textAnchor="middle" 
               fill="#ffffff" 
-              fontSize="8" 
+              fontSize="7" 
               fontWeight="bold"
               style={{ textShadow: '0px 1px 3px black' }}
             >
@@ -475,7 +543,7 @@ const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, is
 
         {/* Car Puck */}
         <g transform={`translate(${carPos.x}, ${carPos.z}) rotate(${rotation})`}>
-          <circle r="6" fill="#00f0ff" opacity="0.3" />
+          <circle r="6" fill="#00f0ff" opacity="0.35" />
           <circle r="4.2" fill="#3b82f6" stroke="#ffffff" strokeWidth="1.5" />
           <path d="M 0 -8 L 3.5 -3 L -3.5 -3 Z" fill="#00f0ff" />
         </g>
@@ -490,21 +558,21 @@ const VectorMap: React.FC<VectorMapProps> = ({ currentPosition, destinations, is
   );
 };
 
-// --- Procedural Canvas Texture Generators ---
-const createCyberRoadTexture = (): THREE.Texture => {
+// --- Procedural Canvas Road Texture Generators ---
+// 1. Vertical Road Texture (for 100 Feet Rd, 80 Feet Rd, and Cross streets)
+const createVerticalRoadTexture = (): THREE.Texture => {
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   if (!ctx) return new THREE.Texture();
 
-  // Dark cyber tarmac
   ctx.fillStyle = '#060913';
   ctx.fillRect(0, 0, 128, 256);
 
-  // Subtle noise
-  for (let i = 0; i < 300; i++) {
-    ctx.fillStyle = 'rgba(255,255,255,0.02)';
+  // Subtle grain
+  for (let i = 0; i < 200; i++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.025)';
     ctx.fillRect(Math.random() * 128, Math.random() * 256, 2, 2);
   }
 
@@ -525,6 +593,47 @@ const createCyberRoadTexture = (): THREE.Texture => {
   ctx.setLineDash([28, 20]);
   ctx.beginPath();
   ctx.moveTo(64, 0); ctx.lineTo(64, 256);
+  ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+};
+
+// 2. Horizontal Road Texture (for CMH Rd, 2nd Main, 6th Main, 12th Main)
+const createHorizontalRoadTexture = (): THREE.Texture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.Texture();
+
+  ctx.fillStyle = '#060913';
+  ctx.fillRect(0, 0, 256, 128);
+
+  for (let i = 0; i < 200; i++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.025)';
+    ctx.fillRect(Math.random() * 256, Math.random() * 128, 2, 2);
+  }
+
+  // Glowing neon green top & bottom curbs
+  ctx.strokeStyle = '#00ff66';
+  ctx.lineWidth = 4;
+  ctx.shadowColor = '#00ff66';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(0, 3); ctx.lineTo(256, 3);
+  ctx.moveTo(0, 125); ctx.lineTo(256, 125);
+  ctx.stroke();
+
+  // Center dashed green line
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 3;
+  ctx.shadowBlur = 6;
+  ctx.setLineDash([28, 20]);
+  ctx.beginPath();
+  ctx.moveTo(0, 64); ctx.lineTo(256, 64);
   ctx.stroke();
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -610,7 +719,7 @@ const AutonomousBlog = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const isResettingCameraRef = useRef<boolean>(false);
-  const targetCamPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 240, 25));
+  const targetCamPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 260, 0));
   const targetLookAtRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
 
   const animatedPropsRef = useRef<{
@@ -646,16 +755,16 @@ const AutonomousBlog = () => {
     };
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x050811, 160, 480);
+    scene.fog = new THREE.Fog(0x050811, 180, 520);
     sceneRef.current = scene;
 
     const container = canvasRef.current.parentElement;
     const initialWidth = container ? container.clientWidth : 800;
     const initialHeight = container ? container.clientHeight : 800;
 
-    // Camera starts in TOP-DOWN bird's eye view showing the full city map
+    // Camera starts in TRUE TOP-DOWN map view (0, 260, 0) looking straight down at (0, 0, 0)
     const camera = new THREE.PerspectiveCamera(50, initialWidth / initialHeight, 0.1, 1000);
-    camera.position.set(0, 240, 25);
+    camera.position.set(0, 260, 0);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -676,7 +785,7 @@ const AutonomousBlog = () => {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 15;
-    controls.maxDistance = 350;
+    controls.maxDistance = 380;
     controls.maxPolarAngle = Math.PI / 2 - 0.04;
     controls.update();
     controlsRef.current = controls;
@@ -695,15 +804,15 @@ const AutonomousBlog = () => {
     if (container) resizeObserver.observe(container);
 
     // --- Cyberpunk Lighting ---
-    const ambientLight = new THREE.AmbientLight(0x0f172a, 0.9);
+    const ambientLight = new THREE.AmbientLight(0x0f172a, 0.95);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0x00ff66, 0x1e1b4b, 0.4);
-    hemiLight.position.set(0, 150, 0);
+    const hemiLight = new THREE.HemisphereLight(0x00ff66, 0x1e1b4b, 0.45);
+    hemiLight.position.set(0, 160, 0);
     scene.add(hemiLight);
 
-    const directionalLight = new THREE.DirectionalLight(0x67e8f9, 1.2);
-    directionalLight.position.set(80, 140, 60);
+    const directionalLight = new THREE.DirectionalLight(0x67e8f9, 1.25);
+    directionalLight.position.set(90, 150, 70);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
@@ -732,106 +841,75 @@ const AutonomousBlog = () => {
     const gridMat = gridHelper.material as THREE.Material;
     if (gridMat) {
       gridMat.transparent = true;
-      gridMat.opacity = 0.18;
+      gridMat.opacity = 0.16;
     }
     scene.add(gridHelper);
 
-    // --- Road Network Construction (Matching Picture 2) ---
-    const roadTexture = createCyberRoadTexture();
-    const roadMaterial = new THREE.MeshStandardMaterial({ 
-      map: roadTexture,
-      roughness: 0.6,
-      metalness: 0.3,
-      side: THREE.DoubleSide
-    });
+    // --- Indiranagar Road Grid Construction (Orthogonal & Clean) ---
+    const vRoadTex = createVerticalRoadTexture();
+    const hRoadTex = createHorizontalRoadTexture();
 
-    const createRoadMesh = (x1: number, z1: number, x2: number, z2: number, width: number = 8) => {
-      const dx = x2 - x1;
-      const dz = z2 - z1;
-      const len = Math.hypot(dx, dz);
-      const angle = Math.atan2(dx, dz);
+    const vRoadMat = new THREE.MeshStandardMaterial({ map: vRoadTex, roughness: 0.6, metalness: 0.3 });
+    const hRoadMat = new THREE.MeshStandardMaterial({ map: hRoadTex, roughness: 0.6, metalness: 0.3 });
 
+    // Helper for strictly vertical North-South roads
+    const createVerticalRoad = (x: number, zStart: number, zEnd: number, width: number = 8) => {
+      const len = Math.abs(zEnd - zStart);
+      const zCenter = (zStart + zEnd) / 2;
       const geo = new THREE.PlaneGeometry(width, len);
-      const mat = roadMaterial.clone();
-      mat.map = roadTexture.clone();
+      const mat = vRoadMat.clone();
+      mat.map = vRoadTex.clone();
       mat.map.repeat.set(1, len / width);
       mat.map.needsUpdate = true;
 
       const mesh = new THREE.Mesh(geo, mat);
       mesh.rotation.x = -Math.PI / 2;
-      mesh.rotation.z = -angle;
-      mesh.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+      mesh.position.set(x, 0.02, zCenter);
       mesh.receiveShadow = true;
       scene.add(mesh);
     };
 
-    // 1. Four Outer Avenues (Width 8, connecting the 4 hero destinations)
-    createRoadMesh(-130, -130, 130, -130, 8); // North Avenue
-    createRoadMesh(130, -130, 130, 130, 8);   // East Avenue
-    createRoadMesh(130, 130, -130, 130, 8);   // South Avenue
-    createRoadMesh(-130, 130, -130, -130, 8); // West Avenue
+    // Helper for strictly horizontal East-West roads
+    const createHorizontalRoad = (z: number, xStart: number, xEnd: number, width: number = 8) => {
+      const len = Math.abs(xEnd - xStart);
+      const xCenter = (xStart + xEnd) / 2;
+      const geo = new THREE.PlaneGeometry(len, width);
+      const mat = hRoadMat.clone();
+      mat.map = hRoadTex.clone();
+      mat.map.repeat.set(len / width, 1);
+      mat.map.needsUpdate = true;
 
-    // 2. Central Boulevards
-    createRoadMesh(0, -130, 0, 130, 8);       // Central North-South Boulevard
-    createRoadMesh(-130, 0, 130, 0, 8);       // Central East-West Boulevard
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(xCenter, 0.02, z);
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    };
 
-    // 3. Intermediate Secondary Streets (Creating Picture 2 Grid Partitioning)
-    createRoadMesh(-65, -130, -65, 130, 6);
-    createRoadMesh(65, -130, 65, 130, 6);
-    createRoadMesh(-130, -65, 130, -65, 6);
-    createRoadMesh(-130, 65, 130, 6, 6);
+    // 1. Primary Arterial Avenues (Vertical)
+    createVerticalRoad(-80, -135, 135, 8.5); // 100 FEET ROAD (Major Commercial Arterial)
+    createVerticalRoad(80, -135, 135, 8.5);  // 80 FEET ROAD (Major Eastern Boulevard)
 
-    // 4. Perimeter Highway Rounded Corner Arcs
-    const cornerConfigs = [
-      { cx: CORNER_OFFSET, cz: -CORNER_OFFSET, start: -Math.PI / 2, end: 0 },
-      { cx: CORNER_OFFSET, cz: CORNER_OFFSET, start: 0, end: Math.PI / 2 },
-      { cx: -CORNER_OFFSET, cz: CORNER_OFFSET, start: Math.PI / 2, end: Math.PI },
-      { cx: -CORNER_OFFSET, cz: -CORNER_OFFSET, start: Math.PI, end: 3 * Math.PI / 2 },
-    ];
+    // 2. Secondary Cross Streets (Vertical)
+    createVerticalRoad(-130, -135, 135, 6); // Outer West Perimeter Road
+    createVerticalRoad(-40, -135, 135, 5.5); // 2nd Cross Road
+    createVerticalRoad(0, -135, 135, 6);    // 4th Cross Road (Central Axis)
+    createVerticalRoad(40, -135, 135, 5.5);  // 6th Cross Road
+    createVerticalRoad(130, -135, 135, 6);  // Outer East Perimeter Road
 
-    cornerConfigs.forEach(cfg => {
-      const segments = 24;
-      const geo = new THREE.BufferGeometry();
-      const vertices: number[] = [];
-      const uvs: number[] = [];
-      const indices: number[] = [];
-      const rInner = CORNER_R - 4;
-      const rOuter = CORNER_R + 4;
+    // 3. Primary Arterial Roads (Horizontal)
+    createHorizontalRoad(-130, -135, 135, 8); // CMH ROAD (Chinmaya Mission Hospital Road)
+    createHorizontalRoad(130, -135, 135, 8);  // 12TH MAIN ROAD (South Arterial)
 
-      for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const angle = cfg.start + t * (cfg.end - cfg.start);
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
+    // 4. Main Connecting Roads (Horizontal)
+    createHorizontalRoad(-80, -135, 135, 6.5); // 2ND MAIN ROAD (North of Defence Colony Park)
+    createHorizontalRoad(-35, -135, 135, 6);   // 5TH MAIN ROAD
+    createHorizontalRoad(15, -135, 135, 6.5);  // 6TH MAIN ROAD (Central Commercial Cross)
+    createHorizontalRoad(75, -135, 135, 6);    // 9TH MAIN ROAD
 
-        vertices.push(cfg.cx + rInner * cos, 0.022, cfg.cz + rInner * sin);
-        vertices.push(cfg.cx + rOuter * cos, 0.022, cfg.cz + rOuter * sin);
-        uvs.push(0, t * 2);
-        uvs.push(1, t * 2);
-      }
-
-      for (let i = 0; i < segments; i++) {
-        const i1 = i * 2;
-        const i2 = i * 2 + 1;
-        const i3 = (i + 1) * 2;
-        const i4 = (i + 1) * 2 + 1;
-        indices.push(i1, i2, i3);
-        indices.push(i2, i4, i3);
-      }
-
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
-
-      const cornerMesh = new THREE.Mesh(geo, roadMaterial);
-      cornerMesh.receiveShadow = true;
-      scene.add(cornerMesh);
-    });
-
-    // --- Plots of Land & Green Outlines (Picture 2 Cadastral Style) ---
+    // --- Plots of Land & Green Outlines (Cadastral Urban Blocks) ---
     const plotBorderMat = new THREE.LineBasicMaterial({ color: 0x00ff66, linewidth: 2 });
-    const parkBorderMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 });
+    const parkBorderMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2.2 });
 
     const sharedDarkMat = new THREE.MeshStandardMaterial({
       color: 0x060914,
@@ -851,7 +929,6 @@ const AutonomousBlog = () => {
       green: new THREE.MeshBasicMaterial({ color: 0x10b981 }),
     };
 
-    // Helper: Add wireframe edges to a mesh
     const addWireframeEdges = (mesh: THREE.Mesh, parentGroup: THREE.Group, colorHex: number = 0x00ff66) => {
       const edges = new THREE.EdgesGeometry(mesh.geometry, 24);
       const line = new THREE.LineSegments(
@@ -871,7 +948,7 @@ const AutonomousBlog = () => {
       const cx = (plot.minX + plot.maxX) / 2;
       const cz = (plot.minZ + plot.maxZ) / 2;
 
-      // 1. Plot Base Pad
+      // 1. Plot Base Pad (Dark Ground Surface)
       const padGeo = new THREE.PlaneGeometry(width - 0.4, depth - 0.4);
       const padMat = new THREE.MeshStandardMaterial({
         color: plot.type === 'park' ? 0x031810 : 0x070b16,
@@ -884,7 +961,7 @@ const AutonomousBlog = () => {
       padMesh.receiveShadow = true;
       scene.add(padMesh);
 
-      // 2. Glowing Neon Boundary Outline (Picture 2 Look)
+      // 2. Glowing Neon Boundary Outline (Clean cadastral perimeter)
       const borderPoints = [
         new THREE.Vector3(plot.minX + 0.2, 0.05, plot.minZ + 0.2),
         new THREE.Vector3(plot.maxX - 0.2, 0.05, plot.minZ + 0.2),
@@ -896,13 +973,13 @@ const AutonomousBlog = () => {
       const borderLine = new THREE.Line(borderGeo, plot.type === 'park' ? parkBorderMat : plotBorderMat);
       scene.add(borderLine);
 
-      // 3. Fill the Plot based on its designation
+      // 3. Fill the Plot based on its type
       if (plot.type === 'park') {
         // --- Urban Park Plot filled with small wireframe trees (Picture 1 style) ---
         const parkGroup = new THREE.Group();
         parkGroup.position.set(cx, 0, cz);
 
-        const treeCount = Math.floor(Math.min(24, Math.max(14, (width * depth) / 100)));
+        const treeCount = Math.floor(Math.min(32, Math.max(16, (width * depth) / 95)));
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x09140f, roughness: 0.8 });
         const crownFillMat = new THREE.MeshStandardMaterial({
           color: 0x064e3b,
@@ -944,24 +1021,20 @@ const AutonomousBlog = () => {
         bGroup.position.set(cx, 0, cz);
 
         const towerH = 48 + Math.random() * 12;
-        const mainW = Math.min(width * 0.45, 14);
-        const mainD = Math.min(depth * 0.45, 14);
+        const mainW = Math.min(width * 0.5, 14);
+        const mainD = Math.min(depth * 0.5, 14);
 
-        // Vertical tower shaft
-        const shaftGeo = new THREE.BoxGeometry(mainW, towerH, mainD);
-        const shaft = new THREE.Mesh(shaftGeo, sharedDarkMat);
+        const shaft = new THREE.Mesh(new THREE.BoxGeometry(mainW, towerH, mainD), sharedDarkMat);
         shaft.position.y = towerH / 2;
         shaft.castShadow = true;
-        shaft.receiveShadow = true;
         bGroup.add(shaft);
         addWireframeEdges(shaft, bGroup);
 
-        // Cantilevered overhang volume projecting horizontally
+        // Cantilevered overhang volume
         const cantW = mainW * 1.5;
         const cantH = 8;
         const cantD = mainD * 0.9;
-        const cantGeo = new THREE.BoxGeometry(cantW, cantH, cantD);
-        const cantMesh = new THREE.Mesh(cantGeo, sharedDarkMat);
+        const cantMesh = new THREE.Mesh(new THREE.BoxGeometry(cantW, cantH, cantD), sharedDarkMat);
         cantMesh.position.set(mainW * 0.35, towerH * 0.65, 0);
         bGroup.add(cantMesh);
         addWireframeEdges(cantMesh, bGroup);
@@ -992,17 +1065,15 @@ const AutonomousBlog = () => {
         const bGroup = new THREE.Group();
         bGroup.position.set(cx, 0, cz);
 
-        const baseW = Math.min(width * 0.6, 18);
-        const baseD = Math.min(depth * 0.6, 18);
+        const baseW = Math.min(width * 0.65, 18);
+        const baseD = Math.min(depth * 0.65, 18);
 
-        // Tier 1
         const t1H = 20;
         const t1Mesh = new THREE.Mesh(new THREE.BoxGeometry(baseW, t1H, baseD), sharedDarkMat);
         t1Mesh.position.y = t1H / 2;
         bGroup.add(t1Mesh);
         addWireframeEdges(t1Mesh, bGroup);
 
-        // Tier 2
         const t2H = 18;
         const t2W = baseW * 0.72;
         const t2D = baseD * 0.72;
@@ -1011,7 +1082,6 @@ const AutonomousBlog = () => {
         bGroup.add(t2Mesh);
         addWireframeEdges(t2Mesh, bGroup);
 
-        // Tier 3
         const t3H = 16;
         const t3W = t2W * 0.65;
         const t3D = t2D * 0.65;
@@ -1020,7 +1090,6 @@ const AutonomousBlog = () => {
         bGroup.add(t3Mesh);
         addWireframeEdges(t3Mesh, bGroup);
 
-        // Antenna
         const topY = t1H + t2H + t3H;
         const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, 12, 6), sharedDarkMat);
         mast.position.y = topY + 6;
@@ -1050,8 +1119,8 @@ const AutonomousBlog = () => {
         const bGroup = new THREE.Group();
         bGroup.position.set(cx, 0, cz);
 
-        const w = Math.min(width * 0.5, 16);
-        const d = Math.min(depth * 0.5, 16);
+        const w = Math.min(width * 0.55, 16);
+        const d = Math.min(depth * 0.55, 16);
         const h = 42 + Math.random() * 8;
 
         const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), sharedDarkMat);
@@ -1059,7 +1128,6 @@ const AutonomousBlog = () => {
         bGroup.add(bodyMesh);
         addWireframeEdges(bodyMesh, bGroup);
 
-        // Slanted wedge roof cap
         const roofGeo = new THREE.ConeGeometry(w * 0.7, 10, 4);
         roofGeo.rotateY(Math.PI / 4);
         const roofMesh = new THREE.Mesh(roofGeo, sharedDarkMat);
@@ -1067,7 +1135,6 @@ const AutonomousBlog = () => {
         bGroup.add(roofMesh);
         addWireframeEdges(roofMesh, bGroup);
 
-        // Horizontal neon band
         const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.4, d + 0.2), neonAccentMats.cyan);
         band.position.y = h * 0.75;
         bGroup.add(band);
@@ -1088,7 +1155,6 @@ const AutonomousBlog = () => {
         bGroup.add(centerMesh);
         addWireframeEdges(centerMesh, bGroup);
 
-        // Dual flank buttresses
         [-8, 8].forEach(fx => {
           const flankH = 36;
           const flank = new THREE.Mesh(new THREE.BoxGeometry(4.5, flankH, mainD * 0.8), sharedDarkMat);
@@ -1097,7 +1163,6 @@ const AutonomousBlog = () => {
           addWireframeEdges(flank, bGroup);
         });
 
-        // Needle spire
         const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.6, 22, 8), sharedDarkMat);
         needle.position.y = centerH + 11;
         bGroup.add(needle);
@@ -1111,12 +1176,12 @@ const AutonomousBlog = () => {
         scene.add(bGroup);
 
       } else if (plot.type === 'commercial' || plot.type === 'lowrise') {
-        // --- Commercial Mid-Rise with Matrix Windows / Staggered Cubes ---
+        // --- Commercial Mid-Rise with Matrix Windows ---
         const bGroup = new THREE.Group();
         bGroup.position.set(cx, 0, cz);
 
-        const b1W = Math.min(width * 0.45, 14);
-        const b1D = Math.min(depth * 0.45, 14);
+        const b1W = Math.min(width * 0.5, 14);
+        const b1D = Math.min(depth * 0.5, 14);
         const b1H = 22 + Math.random() * 8;
 
         const b1 = new THREE.Mesh(new THREE.BoxGeometry(b1W, b1H, b1D), sharedDarkMat);
@@ -1124,7 +1189,6 @@ const AutonomousBlog = () => {
         bGroup.add(b1);
         addWireframeEdges(b1, bGroup);
 
-        // Secondary block in the plot
         const b2W = b1W * 0.85;
         const b2D = b1D * 0.85;
         const b2H = b1H * 0.7;
@@ -1133,7 +1197,6 @@ const AutonomousBlog = () => {
         bGroup.add(b2);
         addWireframeEdges(b2, bGroup);
 
-        // Window dot matrix on facades (Picture 1 style)
         for (let floor = 0; floor < 5; floor++) {
           for (let col = -2; col <= 2; col++) {
             if (Math.random() > 0.35) {
@@ -1155,17 +1218,16 @@ const AutonomousBlog = () => {
       const group = new THREE.Group();
 
       if (dest.id === 'home') {
-        // --- 1. HOME BASE (Fleet Depot & Terminal - North Sector) ---
-        const termGeo = new THREE.BoxGeometry(24, 18, 16);
+        // --- 1. HOME BASE (100 Feet Road // CMH Junction) ---
+        const termGeo = new THREE.BoxGeometry(20, 18, 16);
         const termMat = new THREE.MeshStandardMaterial({ color: 0x0c1324, metalness: 0.85, roughness: 0.25 });
         const terminal = new THREE.Mesh(termGeo, termMat);
-        terminal.position.set(0, 9, -145);
+        terminal.position.set(dest.position3D.x, 9, dest.position3D.z);
         terminal.castShadow = true;
-        terminal.receiveShadow = true;
         group.add(terminal);
         addWireframeEdges(terminal, group, 0x00f0ff);
 
-        // Glass Curtain Wall facing South towards North Avenue
+        // Glass Curtain Wall facing 100 Feet Road (West)
         const glassMat = new THREE.MeshStandardMaterial({
           color: 0x00f0ff,
           emissive: 0x00f0ff,
@@ -1175,43 +1237,44 @@ const AutonomousBlog = () => {
           transparent: true,
           opacity: 0.85
         });
-        const glassWall = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 0.4), glassMat);
-        glassWall.position.set(0, 8, -136.8);
+        const glassWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, 12, 14), glassMat);
+        glassWall.position.set(dest.position3D.x - 10.2, 8, dest.position3D.z);
         group.add(glassWall);
 
-        // Cantilevered Canopy
+        // Cantilevered Canopy extending towards 100 Feet Road
         const canopyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7 });
-        const canopy = new THREE.Mesh(new THREE.BoxGeometry(22, 1.2, 10), canopyMat);
-        canopy.position.set(0, 8.5, -137);
+        const canopy = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 16), canopyMat);
+        canopy.position.set(dest.position3D.x - 12, 8.5, dest.position3D.z);
         group.add(canopy);
         addWireframeEdges(canopy, group, 0x00f0ff);
 
         // Dual Supercharger Pylons
-        [-6, 6].forEach(px => {
+        [-5, 5].forEach(pz => {
           const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4, 0.9), new THREE.MeshStandardMaterial({ color: 0x090d16 }));
-          pylon.position.set(px, 2, -133);
-          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.2, 0.92), neonAccentMats.cyan);
+          pylon.position.set(dest.position3D.x - 15, 2, dest.position3D.z + pz);
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.92, 3.2, 0.2), neonAccentMats.cyan);
           pylon.add(bar);
           group.add(pylon);
         });
 
-        // 3D Illuminated Signboard
-        const homeSign = createBillboardMesh(18, 4.5, 'HOME BASE', 'FLEET COMMAND // DEPOT-01', '#00f0ff');
-        homeSign.position.set(0, 16.5, -136.7);
+        // 3D Illuminated Signboard facing 100 Feet Road
+        const homeSign = createBillboardMesh(16, 4.2, 'HOME BASE', '100 FT RD // FLEET DEPOT', '#00f0ff');
+        homeSign.position.set(dest.position3D.x - 10.4, 16.5, dest.position3D.z);
+        homeSign.rotation.y = -Math.PI / 2;
         group.add(homeSign);
 
       } else if (dest.id === 'publications') {
-        // --- 2. PUBLICATIONS HUB (CV & ML Research Institute - East Sector) ---
+        // --- 2. PUBLICATIONS HUB (80 Feet Road Campus) ---
         const labTowerMat = new THREE.MeshStandardMaterial({ color: 0x064e3b, metalness: 0.7, roughness: 0.3 });
         
         const tower1 = new THREE.Mesh(new THREE.BoxGeometry(12, 28, 12), labTowerMat);
-        tower1.position.set(145, 14, -8);
+        tower1.position.set(dest.position3D.x, 14, dest.position3D.z - 8);
         tower1.castShadow = true;
         group.add(tower1);
         addWireframeEdges(tower1, group, 0x10b981);
 
         const tower2 = new THREE.Mesh(new THREE.BoxGeometry(12, 24, 12), labTowerMat);
-        tower2.position.set(145, 12, 8);
+        tower2.position.set(dest.position3D.x, 12, dest.position3D.z + 8);
         tower2.castShadow = true;
         group.add(tower2);
         addWireframeEdges(tower2, group, 0x10b981);
@@ -1221,27 +1284,27 @@ const AutonomousBlog = () => {
           new THREE.BoxGeometry(8, 5, 16),
           new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x059669, emissiveIntensity: 0.45, transparent: true, opacity: 0.85 })
         );
-        skybridge.position.set(145, 18, 0);
+        skybridge.position.set(dest.position3D.x, 18, dest.position3D.z);
         group.add(skybridge);
         addWireframeEdges(skybridge, group, 0x10b981);
 
         // Quantum Data Core with glowing revolving rings
         const coreMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
         const core = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 20, 24), coreMat);
-        core.position.set(145, 11, 0);
+        core.position.set(dest.position3D.x, 11, dest.position3D.z);
         group.add(core);
 
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
         for (let r = 0; r < 3; r++) {
           const cRing = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.15, 8, 32), ringMat);
           cRing.rotation.x = Math.PI / 2;
-          cRing.position.set(145, 6 + r * 5, 0);
+          cRing.position.set(dest.position3D.x, 6 + r * 5, dest.position3D.z);
           group.add(cRing);
         }
 
         // Rotating rooftop radar dish
         const radarGroup = new THREE.Group();
-        radarGroup.position.set(145, 29, -8);
+        radarGroup.position.set(dest.position3D.x, 29, dest.position3D.z - 8);
         const dish = new THREE.Mesh(
           new THREE.CylinderGeometry(2.5, 0.3, 0.4, 16),
           new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
@@ -1251,70 +1314,70 @@ const AutonomousBlog = () => {
         group.add(radarGroup);
         animatedPropsRef.current.radarDishes.push(radarGroup);
 
-        // 3D Neon Sign facing West towards East Avenue
-        const pubSign = createBillboardMesh(18, 4.5, 'PUBLICATIONS', 'CV & ML RESEARCH LAB', '#10b981');
-        pubSign.position.set(137.8, 19, 0);
+        // 3D Neon Sign facing 80 Feet Road (West)
+        const pubSign = createBillboardMesh(16, 4.2, 'PUBLICATIONS', '80 FT RD // CV RESEARCH', '#10b981');
+        pubSign.position.set(dest.position3D.x - 7.5, 18, dest.position3D.z);
         pubSign.rotation.y = -Math.PI / 2;
         group.add(pubSign);
 
       } else if (dest.id === 'blog') {
-        // --- 3. BLOG TOWER (Stepped Cyber Megatower - South Sector) ---
+        // --- 3. BLOG TOWER (100 Feet Road // 12th Main) ---
         const towerMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, metalness: 0.8, roughness: 0.25 });
 
-        // 3-Stage Stepped Architecture
-        const base = new THREE.Mesh(new THREE.BoxGeometry(20, 18, 20), towerMat);
-        base.position.set(0, 9, 145);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(18, 18, 18), towerMat);
+        base.position.set(dest.position3D.x, 9, dest.position3D.z);
         base.castShadow = true;
         group.add(base);
         addWireframeEdges(base, group, 0xf59e0b);
 
-        const mid = new THREE.Mesh(new THREE.BoxGeometry(15, 18, 15), towerMat);
-        mid.position.set(0, 27, 145);
+        const mid = new THREE.Mesh(new THREE.BoxGeometry(14, 18, 14), towerMat);
+        mid.position.set(dest.position3D.x, 27, dest.position3D.z);
         mid.castShadow = true;
         group.add(mid);
         addWireframeEdges(mid, group, 0xf59e0b);
 
         const top = new THREE.Mesh(new THREE.BoxGeometry(10, 16, 10), towerMat);
-        top.position.set(0, 44, 145);
+        top.position.set(dest.position3D.x, 44, dest.position3D.z);
         top.castShadow = true;
         group.add(top);
         addWireframeEdges(top, group, 0xf59e0b);
 
-        // Helipad with glowing ring atop roof
+        // Helipad atop roof
         const helipad = new THREE.Mesh(
           new THREE.CylinderGeometry(4.8, 4.8, 0.4, 24),
           new THREE.MeshStandardMaterial({ color: 0x292524 })
         );
-        helipad.position.set(0, 52.2, 145);
+        helipad.position.set(dest.position3D.x, 52.2, dest.position3D.z);
         group.add(helipad);
 
         const heliRing = new THREE.Mesh(new THREE.RingGeometry(4.3, 4.6, 24), neonAccentMats.yellow);
         heliRing.rotation.x = -Math.PI / 2;
-        heliRing.position.set(0, 52.45, 145);
+        heliRing.position.set(dest.position3D.x, 52.45, dest.position3D.z);
         group.add(heliRing);
 
-        // Communications needle mast
+        // Needle mast with aviation beacon
         const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 16, 8), sharedDarkMat);
-        mast.position.set(0, 60, 145);
+        mast.position.set(dest.position3D.x, 60, dest.position3D.z);
         group.add(mast);
 
         const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-        beacon.position.set(0, 68, 145);
+        beacon.position.set(dest.position3D.x, 68, dest.position3D.z);
         group.add(beacon);
         animatedPropsRef.current.blinkingLights.push(beacon);
 
-        // 3D Neon Sign facing North towards South Avenue
-        const blogSign = createBillboardMesh(18, 4.5, 'BLOG TOWER', 'TECH PERSPECTIVES // 01', '#f59e0b');
-        blogSign.position.set(0, 22, 134.8);
+        // 3D Neon Sign facing 100 Feet Road (West)
+        const blogSign = createBillboardMesh(16, 4.2, 'BLOG TOWER', '100 FT RD // TECH PERSPECTIVES', '#f59e0b');
+        blogSign.position.set(dest.position3D.x - 9.5, 20, dest.position3D.z);
+        blogSign.rotation.y = -Math.PI / 2;
         group.add(blogSign);
 
       } else {
-        // --- 4. ABOUT PLAZA (Cybernetic Pavilion & Atrium - West Sector) ---
+        // --- 4. ABOUT PLAZA (100 Feet Road // Defence Colony Pavilion) ---
         const dais = new THREE.Mesh(
           new THREE.CylinderGeometry(14, 15, 1.4, 8),
           new THREE.MeshStandardMaterial({ color: 0x2e1065, metalness: 0.8, roughness: 0.3 })
         );
-        dais.position.set(-145, 0.7, 0);
+        dais.position.set(dest.position3D.x, 0.7, dest.position3D.z);
         dais.receiveShadow = true;
         group.add(dais);
         addWireframeEdges(dais, group, 0x8b5cf6);
@@ -1322,10 +1385,10 @@ const AutonomousBlog = () => {
         // 4 Illuminated Cyber-Pillars
         const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
         [
-          { x: -145 - 6, z: -6 },
-          { x: -145 + 6, z: -6 },
-          { x: -145 - 6, z: 6 },
-          { x: -145 + 6, z: 6 },
+          { x: dest.position3D.x - 6, z: dest.position3D.z - 6 },
+          { x: dest.position3D.x + 6, z: dest.position3D.z - 6 },
+          { x: dest.position3D.x - 6, z: dest.position3D.z + 6 },
+          { x: dest.position3D.x + 6, z: dest.position3D.z + 6 },
         ].forEach(pp => {
           const pillar = new THREE.Mesh(new THREE.BoxGeometry(2, 15, 2), pillarMat);
           pillar.position.set(pp.x, 7.5, pp.z);
@@ -1347,7 +1410,7 @@ const AutonomousBlog = () => {
             opacity: 0.8
           })
         );
-        canopy.position.set(-145, 15.5, 0);
+        canopy.position.set(dest.position3D.x, 15.5, dest.position3D.z);
         group.add(canopy);
         addWireframeEdges(canopy, group, 0x8b5cf6);
 
@@ -1361,24 +1424,21 @@ const AutonomousBlog = () => {
             wireframe: true
           })
         );
-        holoOrb.position.set(-145, 8, 0);
+        holoOrb.position.set(dest.position3D.x, 8, dest.position3D.z);
         group.add(holoOrb);
         animatedPropsRef.current.holoOrb = holoOrb;
 
-        // 3D Neon Sign facing East towards West Avenue
-        const aboutSign = createBillboardMesh(18, 4.5, 'ABOUT PLAZA', 'AI & ROBOTICS // KALYANI', '#8b5cf6');
-        aboutSign.position.set(-137.8, 17, 0);
+        // 3D Neon Sign facing 100 Feet Road (East)
+        const aboutSign = createBillboardMesh(16, 4.2, 'ABOUT PLAZA', '100 FT RD // AI & ROBOTICS', '#8b5cf6');
+        aboutSign.position.set(dest.position3D.x + 10.5, 16, dest.position3D.z);
         aboutSign.rotation.y = Math.PI / 2;
         group.add(aboutSign);
       }
 
-      // Parking / Docking Stop Box on the road
-      const isEast = dest.id === 'publications';
-      const isWest = dest.id === 'about';
+      // Parking / Docking Stop Box on the road (Clean rectangular stopping bay)
       const stopLineMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.85 });
-      const stopBox = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), stopLineMat);
+      const stopBox = new THREE.Mesh(new THREE.PlaneGeometry(6, 8), stopLineMat);
       stopBox.rotation.x = -Math.PI / 2;
-      if (isEast || isWest) stopBox.rotation.z = Math.PI / 2;
       stopBox.position.set(dest.stopPosition.x, 0.026, dest.stopPosition.z);
       group.add(stopBox);
 
@@ -1477,9 +1537,9 @@ const AutonomousBlog = () => {
     tl2.position.set(-0.72, 0.62, -2.31);
     car.add(tl2);
 
-    // Start parked at Home Base (North Avenue: x=0, z=-130, facing East)
-    car.position.set(0, 0.1, -130);
-    car.rotation.y = Math.PI / 2;
+    // Start parked at Home Base (100 Feet Road: x=-80, z=-105, facing South)
+    car.position.set(-80, 0.1, -105);
+    car.rotation.y = Math.PI;
     carRef.current = car;
     scene.add(car);
 
@@ -1491,7 +1551,6 @@ const AutonomousBlog = () => {
       animId = requestAnimationFrame(animate);
       frame++;
 
-      // Subtle vehicle hovering idle animation
       if (!isNavigatingRef.current && carRef.current) {
         carRef.current.position.y = 0.1 + Math.sin(frame * 0.03) * 0.025;
       } else if (carRef.current) {
@@ -1559,7 +1618,7 @@ const AutonomousBlog = () => {
   const setCameraTopDown = () => {
     if (isNavigating) return;
     setViewMode('topDown');
-    targetCamPosRef.current.set(0, 240, 25);
+    targetCamPosRef.current.set(0, 260, 0);
     targetLookAtRef.current.set(0, 0, 0);
     isResettingCameraRef.current = true;
   };
@@ -1680,14 +1739,13 @@ const AutonomousBlog = () => {
         }
       }
 
-      // 5. CAMERA FOLLOW CAR (Third-person chase camera closely tracking the car)
+      // 5. Camera Follow Car (Third-person chase camera closely tracking the car)
       if (cameraRef.current && carRef.current) {
         const carX = carRef.current.position.x;
         const carY = carRef.current.position.y;
         const carZ = carRef.current.position.z;
         const heading = carRef.current.rotation.y;
 
-        // Smooth follow position: behind and above the car
         const followDist = 26;
         const followHeight = 14;
         const targetCamX = carX - Math.sin(heading) * followDist;
@@ -1724,29 +1782,29 @@ const AutonomousBlog = () => {
     if (!selectedDestination) return null;
     const content: Record<string, { title: string; body: React.ReactNode }> = {
       home: { 
-        title: 'Mission Control', 
+        title: 'Mission Control // 100 Feet Road', 
         body: (
           <div className="space-y-6">
             <p className="text-gray-300 text-lg leading-relaxed">
-              Think of this as a virtual city tour, except the car is currently on training wheels following hardcoded paths (procedural city generation and actual pathfinding coming in v2)
+              Welcome to my autonomous portfolio. This interface represents a living digital twin of my work in machine learning and computer vision, modeled after the bustling tech grid of Indiranagar, Bangalore.
             </p>
             <div className="bg-slate-800/60 p-5 rounded-xl border border-slate-700">
               <h3 className="text-white font-bold mb-3 flex items-center gap-2">
                 <Navigation2 className="w-5 h-5 text-cyan-400" />
-                How to Hitch a Ride
+                Navigation Protocols
               </h3>
               <ul className="space-y-3 text-gray-300">
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">1</span>
-                  <span>Pick a stop from the <strong>Control Center</strong> on the left.</span>
+                  <span>Select any destination sector along <strong>100 Feet Road</strong> or <strong>80 Feet Road</strong> from the Control Center.</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">2</span>
-                  <span>Ride shotgun while the car cruises thorugh the city streets </span>
+                  <span>The camera smoothly focuses on the autonomous vehicle and follows it along the avenue grid past Defence Colony Park.</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">3</span>
-                  <span>Hop out at your destination to check out my resume, blog posts, or my lone research paper (not for long hopefully 🤞)</span>
+                  <span>Upon arrival at the destination dock, the research dossier will open automatically.</span>
                 </li>
               </ul>
             </div>
@@ -1845,10 +1903,10 @@ const AutonomousBlog = () => {
                   Control Center
                 </h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold tracking-wider">
-                  V2X MATRIX ONLINE
+                  V2X MATRIX // INDIRANAGAR
                 </span>
               </div>
-              <p className="text-gray-400 text-xs font-mono tracking-wide">AUTONOMOUS CADASTRAL CITY SYSTEM</p>
+              <p className="text-gray-400 text-xs font-mono tracking-wide">AUTONOMOUS CADASTRAL URBAN MATRIX</p>
             </div>
             
             {/* Destination List */}
@@ -1870,7 +1928,7 @@ const AutonomousBlog = () => {
                   </div>
                   <div className="flex-1">
                     <div className="font-semibold text-slate-200 group-hover:text-white transition-colors">{dest.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5 font-mono">{dest.sector} // [{dest.stopPosition.x}, {dest.stopPosition.z}]</div>
+                    <div className="text-xs text-slate-500 mt-0.5 font-mono">{dest.sector}</div>
                   </div>
                   {currentPosition.id === dest.id && (
                     <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_#00f0ff] animate-pulse"></div>
@@ -1881,8 +1939,8 @@ const AutonomousBlog = () => {
 
             {/* Quick Stats / Info Footer */}
             <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 text-xs font-mono text-slate-400 flex items-center justify-between">
-              <span>PLOTS: 32 REGISTERED</span>
-              <span>PARKS: 8 GROVES</span>
+              <span>ARTERIALS: 100 FT & 80 FT RD</span>
+              <span>DEFENCE COLONY PARK</span>
             </div>
           </div>
           
@@ -1947,7 +2005,7 @@ const AutonomousBlog = () => {
               </div>
             </div>
 
-            {/* Circular Minimap Overlay (Top-Right) */}
+            {/* Minimap Overlay (Top-Right) */}
             <div className="absolute top-6 right-6 w-48 h-48 rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-[#050811]">
               <VectorMap
                 currentPosition={currentPosition}

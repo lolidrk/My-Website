@@ -1782,29 +1782,29 @@ const AutonomousBlog = () => {
     if (!selectedDestination) return null;
     const content: Record<string, { title: string; body: React.ReactNode }> = {
       home: { 
-        title: 'Mission Control // 100 Feet Road', 
+        title: 'Mission Control', 
         body: (
           <div className="space-y-6">
             <p className="text-gray-300 text-lg leading-relaxed">
-              Welcome to my autonomous portfolio. This interface represents a living digital twin of my work in machine learning and computer vision, modeled after the bustling tech grid of Indiranagar, Bangalore.
+              Think of this as a virtual city tour, except the car is on digital training wheels and blindly following a hardcoded path.(procedural city generation and actual pathfinding coming in v2).
             </p>
             <div className="bg-slate-800/60 p-5 rounded-xl border border-slate-700">
               <h3 className="text-white font-bold mb-3 flex items-center gap-2">
                 <Navigation2 className="w-5 h-5 text-cyan-400" />
-                Navigation Protocols
+                How to hitch a ride
               </h3>
               <ul className="space-y-3 text-gray-300">
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">1</span>
-                  <span>Select any destination sector along <strong>100 Feet Road</strong> or <strong>80 Feet Road</strong> from the Control Center.</span>
-                </li>
+                  <span>Pick a stop from the <strong>Control Center</strong> on your left.</span>
+    </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">2</span>
-                  <span>The camera smoothly focuses on the autonomous vehicle and follows it along the avenue grid past Defence Colony Park.</span>
+                  <span>Ride shotgun while the car cruises through the city streets.</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">3</span>
-                  <span>Upon arrival at the destination dock, the research dossier will open automatically.</span>
+                  <span>Hop out at your destination to check out my resume, blog posts, or my lone research paper.</span>
                 </li>
               </ul>
             </div>

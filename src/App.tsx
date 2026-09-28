@@ -1874,7 +1874,7 @@ const AutonomousBlog = () => {
             at kalyanikulkarni2002@gmail.com.
             <br /><br />
             <a 
-              href="https://drive.google.com/file/d/1ObAfUlCZxJTFjtayz1PFJjWL0vS4abp_/view?usp=drive_link"
+              href="https://drive.google.com/file/d/1hlFTMDUyiWCNOtmdnFk9rHwelqYsDlGF/view?usp=drive_link"
               target="_blank"
               rel="noopener noreferrer"
               className="text-cyan-400 underline hover:text-cyan-300 font-semibold"
